@@ -4167,7 +4167,6 @@ class RealEstateMonitorApp:
         progress_window.title("데이터 수집 중...")
         progress_window.geometry("400x150")
         progress_window.transient(self.root)
-        progress_window.grab_set()
         
         ttk.Label(progress_window, text=f"{apt_name} ({target_area}㎡) 실거래 데이터를 수집 중입니다...", wraplength=350).pack(pady=10)
         progress_label = ttk.Label(progress_window, text="0% 완료")
@@ -4326,7 +4325,6 @@ class RealEstateMonitorApp:
         progress_window.title("데이터 수집 중...")
         progress_window.geometry("500x200")
         progress_window.transient(self.root)
-        progress_window.grab_set()
         
         ttk.Label(progress_window, text=f"{apt_name} ({target_area}㎡) 실거래 데이터를 수집 중입니다...", 
                  wraplength=450).pack(pady=10)
@@ -4598,7 +4596,6 @@ class RealEstateMonitorApp:
         progress_window.title("신고가 재검증 및 신규 단지 탐색 중...")
         progress_window.geometry("600x300")
         progress_window.transient(self.root)
-        progress_window.grab_set()
         
         ttk.Label(progress_window, text="신고가 재검증, 신규 단지 탐색, 연식 정보 보정 중...", 
                  wraplength=550).pack(pady=10)
@@ -4953,8 +4950,6 @@ class RealEstateMonitorApp:
             progress_window.title("데이터 갱신 중")
             progress_window.geometry("500x150")
             progress_window.transient(self.root)
-            progress_window.grab_set()
-            progress_window.attributes('-topmost', True)  # 최상단 표시
 
             # 화면 중앙에 배치
             progress_window.update_idletasks()
@@ -7119,8 +7114,6 @@ class RealEstateMonitorApp:
         progress_window.title("거래량 집계 중")
         progress_window.geometry("500x150")
         progress_window.transient(self.root)
-        progress_window.grab_set()
-        progress_window.attributes('-topmost', True)
 
         # 화면 중앙에 배치
         progress_window.update_idletasks()

@@ -5379,7 +5379,7 @@ class RealEstateMonitorApp:
             <section class="card" data-region="{sido} {region_for_filter}"
                      data-build-year="{data_year}" data-young="{is_young}"
                      data-very-young="{is_very_young}" data-old="{is_old}" data-area="{area}">
-              <h3>{name} {year_badge} <span class="tag">{area}㎡</span></h3>
+              <h3>{name} {year_badge} <span class="tag">전용면적 {area}㎡</span></h3>
               <div class="card-sub">📍 {location}</div>
               <div class="grid">
                 <div class="k">이번 실거래</div>
@@ -6473,7 +6473,7 @@ class RealEstateMonitorApp:
 
         now = datetime.now().strftime('%Y-%m-%d %H:%M')
         total = len(filtered_apts)
-        area_name = "84㎡ (국평 25평형)" if area_type == '84' else "59㎡ (국평 18평형)"
+        area_name = "전용면적 84㎡ (국평 25평형)" if area_type == '84' else "전용면적 59㎡ (국평 18평형)"
 
         # 카드 HTML 생성
         cards_html = ""
@@ -6634,7 +6634,7 @@ class RealEstateMonitorApp:
             cards_html += f"""
             <div class="card" data-price-range="{price_range}">
               <div class="card-header">
-                <h3>🏆 {rank}위 {rank_badge} {escape(apt['apt_name'])} {build_year_str} {escape(apt['area'])}</h3>
+                <h3>🏆 {rank}위 {rank_badge} {escape(apt['apt_name'])} {build_year_str} 전용면적 {escape(apt['area'])}</h3>
                 {f'<div class="regulation-badges">{regulation_badges}</div>' if regulation_badges else ''}
               </div>
               <div class="divider"></div>

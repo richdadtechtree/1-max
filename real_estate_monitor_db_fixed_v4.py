@@ -6426,6 +6426,27 @@ class RealEstateMonitorApp:
         # 가격 순으로 정렬 (높은 가격부터)
         filtered_apts.sort(key=lambda x: x['new_price'], reverse=True)
 
+        # ========== 중복 단지 제거 (띄어쓰기 무시) ==========
+        # 띄어쓰기 제거한 이름을 키로 사용하여 중복 체크
+        unique_apts = {}
+        for apt in filtered_apts:
+            # 띄어쓰기, 대소문자 제거한 정규화된 이름
+            normalized_name = apt['apt_name'].replace(' ', '').replace('-', '').lower()
+
+            # 같은 정규화 이름이 있으면 가격이 더 높은 것만 유지
+            if normalized_name in unique_apts:
+                if apt['new_price'] > unique_apts[normalized_name]['new_price']:
+                    logging.info(f"[중복 제거] '{unique_apts[normalized_name]['apt_name']}' ({unique_apts[normalized_name]['new_price']:,}만원) → '{apt['apt_name']}' ({apt['new_price']:,}만원) 유지")
+                    unique_apts[normalized_name] = apt
+                else:
+                    logging.info(f"[중복 제거] '{apt['apt_name']}' ({apt['new_price']:,}만원) 제거 (기존: '{unique_apts[normalized_name]['apt_name']}' {unique_apts[normalized_name]['new_price']:,}만원)")
+            else:
+                unique_apts[normalized_name] = apt
+
+        # 중복 제거된 리스트로 교체 (가격 순으로 다시 정렬)
+        filtered_apts = sorted(unique_apts.values(), key=lambda x: x['new_price'], reverse=True)
+        # ==========================================================
+
         # 이전 순위 조회 (가장 최근 2번째 데이터와 비교)
         try:
             cursor.execute("""

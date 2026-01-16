@@ -6995,9 +6995,10 @@ class RealEstateMonitorApp:
         total = len(filtered_apts)
         area_name = "전용면적 84㎡ (국평 25평형)" if area_type == '84' else "전용면적 59㎡ (국평 18평형)"
 
-        # 카드 HTML 생성
+        # 카드 HTML 생성 (상위 2000위까지만)
+        MAX_RANK_DISPLAY = 2000
         cards_html = ""
-        for apt in filtered_apts:
+        for apt in filtered_apts[:MAX_RANK_DISPLAY]:
             rank = apt['current_rank']
             rank_change = apt.get('rank_change')
 
@@ -7369,7 +7370,7 @@ class RealEstateMonitorApp:
           <div class="page">
             <header class="header">
               <h1>🏆 {area_name} 가격 순위</h1>
-              <p class="sub">{escape(now)} 기준 · 총 {total}개 아파트</p>
+              <p class="sub">{escape(now)} 기준 · 상위 {min(total, MAX_RANK_DISPLAY)}위 (전체 {total}개 단지)</p>
 
               <div class="price-filter">
                 <button class="price-btn active" data-range="all">전체</button>

@@ -8092,6 +8092,11 @@ class RealEstateMonitorApp:
         all_trades = []
         today = datetime.now()
 
+        # 최근 6개월 기준 날짜 계산
+        from dateutil.relativedelta import relativedelta
+        six_months_ago = today - relativedelta(months=6)
+        logging.info(f"[가격대별 분위] 거래 데이터 기간: {six_months_ago.strftime('%Y-%m-%d')} ~ {today.strftime('%Y-%m-%d')} (최근 6개월)")
+
         # 현재 활성 리스트 이름 가져오기
         list_name = "모니터링 리스트"
         try:
@@ -8135,8 +8140,18 @@ class RealEstateMonitorApp:
                             trade_date_str = trade_date.replace('.', '-').replace('/', '-')
                             if ' ' in trade_date_str:
                                 trade_date_str = trade_date_str.split()[0]
+                        elif isinstance(trade_date, datetime):
+                            trade_date_str = trade_date.strftime('%Y-%m-%d')
                         else:
                             trade_date_str = str(trade_date)
+
+                        # 최근 6개월 이내 거래만 포함
+                        try:
+                            trade_dt = datetime.strptime(trade_date_str, '%Y-%m-%d')
+                            if trade_dt < six_months_ago:
+                                continue  # 6개월 이전 거래는 스킵
+                        except:
+                            pass  # 날짜 파싱 실패시 일단 포함
 
                         # 가격
                         price = trade.get('price', 0)
@@ -8592,9 +8607,11 @@ class RealEstateMonitorApp:
             const datasetIndex = element.datasetIndex;
             const index = element.index;
 
-            // 클릭한 가격대 계산
-            const priceBracket = (index + 1) * 10000;
-            const priceLabel = (priceBracket / 10000) + '억';
+            // 클릭한 라벨에서 가격대 추출 (예: "5억" -> 50000)
+            const priceLabel = priceChart.data.labels[index];
+            const priceBracket = parseInt(priceLabel.replace('억', '')) * 10000;
+
+            console.log('[클릭] 라벨:', priceLabel, '가격대:', priceBracket, '만원');
 
             // 해당 기간 가져오기
             let startDate, endDate, periodLabel;
@@ -8617,6 +8634,8 @@ class RealEstateMonitorApp:
 
               return tradeDate >= start && tradeDate <= end && tradeBracket === priceBracket;
             }});
+
+            console.log('[클릭] 기간:', startDate, '~', endDate, '필터된 거래:', filteredTrades.length, '건');
 
             // 모달 표시
             showTradeModal(priceLabel, periodLabel, filteredTrades);
@@ -8715,43 +8734,42 @@ class RealEstateMonitorApp:
             document.getElementById('stat1Title').textContent = period1Label;
             document.getElementById('stat2Title').textContent = period2Label;
 
-            // 데이터 집계
+            // 데이터 집계 (선택한 기간 내 거래만 집계됨)
             const period1Data = aggregateByPriceBracket(allTrades, period1Start, period1End);
             const period2Data = aggregateByPriceBracket(allTrades, period2Start, period2End);
 
-            // 선택한 두 기간의 실제 거래가 있는 가격대 찾기
-            const period1Prices = Object.keys(period1Data).map(k => parseInt(k)).filter(p => period1Data[p] > 0);
-            const period2Prices = Object.keys(period2Data).map(k => parseInt(k)).filter(p => period2Data[p] > 0);
-            const allPeriodPrices = [...period1Prices, ...period2Prices];
+            console.log('[가격대별 분위] period1Data 키:', Object.keys(period1Data));
+            console.log('[가격대별 분위] period2Data 키:', Object.keys(period2Data));
 
-            if (allPeriodPrices.length === 0) {{
+            // 선택한 두 기간 내 실제 거래가 있는 가격대만 추출 (값이 0보다 큰 것만)
+            const period1Brackets = Object.entries(period1Data).filter(([k, v]) => v > 0).map(([k, v]) => parseInt(k));
+            const period2Brackets = Object.entries(period2Data).filter(([k, v]) => v > 0).map(([k, v]) => parseInt(k));
+
+            // 두 기간의 가격대 합집합 (중복 제거)
+            const allBracketsSet = new Set([...period1Brackets, ...period2Brackets]);
+            const sortedBrackets = Array.from(allBracketsSet).sort((a, b) => a - b);
+
+            console.log('[가격대별 분위] 선택 기간 내 실제 거래 가격대:', sortedBrackets.map(b => (b/10000) + '억'));
+
+            if (sortedBrackets.length === 0) {{
               console.warn('[가격대별 분위] 선택한 기간에 거래 데이터가 없습니다.');
               document.querySelector('.chart-container').innerHTML = '<div style="text-align:center; padding:100px; color:#999;">선택한 기간에 거래 데이터가 없습니다.</div>';
               return;
             }}
 
-            // 실제 거래가 있는 최소/최대 구간 찾기
-            const actualMinPrice = Math.min(...allPeriodPrices);
-            const actualMaxPrice = Math.max(...allPeriodPrices);
-            const minPriceBracket = Math.floor(actualMinPrice / 10000) * 10000;
-            const maxPriceBracket = Math.ceil(actualMaxPrice / 10000) * 10000;
-
-            console.log('[가격대별 분위] 실제 거래가 범위:', actualMinPrice.toLocaleString(), '~', actualMaxPrice.toLocaleString(), '만원');
-            console.log('[가격대별 분위] X축 표시 구간:', (minPriceBracket/10000), '억 ~', (maxPriceBracket/10000), '억');
-
-            // 거래가 있는 구간만 라벨 생성
+            // 라벨 및 데이터 배열 생성
             const labels = [];
             const period1Counts = [];
             const period2Counts = [];
 
-            for (let i = minPriceBracket; i <= maxPriceBracket; i += 10000) {{
-              // 두 기간 중 하나라도 거래가 있으면 표시
-              if (period1Data[i] > 0 || period2Data[i] > 0) {{
-                labels.push((i / 10000) + '억');
-                period1Counts.push(period1Data[i] || 0);
-                period2Counts.push(period2Data[i] || 0);
-              }}
-            }}
+            sortedBrackets.forEach(bracket => {{
+              labels.push((bracket / 10000) + '억');
+              period1Counts.push(period1Data[bracket] || 0);
+              period2Counts.push(period2Data[bracket] || 0);
+            }});
+
+            console.log('[가격대별 분위] X축 라벨:', labels);
+            console.log('[가격대별 분위] 최소~최대:', labels[0], '~', labels[labels.length - 1]);
 
             console.log('[가격대별 분위] 표시 구간 수:', labels.length, '개');
             console.log('[가격대별 분위] 기간1 데이터:', period1Counts);
@@ -8862,7 +8880,8 @@ class RealEstateMonitorApp:
                       }}
                     }},
                     y: {{
-                      beginAtZero: true,
+                      type: 'logarithmic',
+                      min: 1,
                       grid: {{
                         color: 'rgba(0, 0, 0, 0.05)'
                       }},
@@ -8871,7 +8890,14 @@ class RealEstateMonitorApp:
                           size: 12
                         }},
                         callback: function(value) {{
-                          return value + '건';
+                          // 로그 스케일에서 깔끔한 숫자만 표시
+                          if (value === 1 || value === 2 || value === 5 ||
+                              value === 10 || value === 20 || value === 50 ||
+                              value === 100 || value === 200 || value === 500 ||
+                              value === 1000 || value === 2000 || value === 5000) {{
+                            return value + '건';
+                          }}
+                          return '';
                         }}
                       }}
                     }}

@@ -8049,12 +8049,32 @@ class RealEstateMonitorApp:
     def export_price_distribution_html(self):
         """모니터링 중인 단지들의 저장된 거래 데이터를 기반으로 가격대별 분위 HTML 생성"""
         try:
+            # 현재 활성 리스트 이름 확인
+            list_name = ""
+            try:
+                conn = sqlite3.connect(self.db_path)
+                cursor = conn.cursor()
+                cursor.execute("SELECT name FROM monitoring_lists WHERE is_active = 1")
+                row = cursor.fetchone()
+                if row:
+                    list_name = row[0]
+                conn.close()
+            except:
+                pass
+
+            # 서울 수도권인 경우 지역 선택 다이얼로그 표시
+            region_filter = None  # None이면 전체
+            if "서울" in list_name and "수도권" in list_name:
+                region_filter = self._show_region_selection_dialog()
+                if region_filter == "cancel":
+                    return  # 사용자가 취소함
+
             # 저장 경로
             reports_dir = os.path.join(self.download_path, "reports")
             os.makedirs(reports_dir, exist_ok=True)
 
             # HTML 생성 (DB에서 거래 데이터 조회)
-            html_str = self.build_price_distribution_html()
+            html_str = self.build_price_distribution_html(region_filter=region_filter)
 
             if not html_str:
                 messagebox.showwarning("알림", "가격대별 거래 데이터를 생성할 수 없습니다.")
@@ -8062,7 +8082,14 @@ class RealEstateMonitorApp:
 
             # 타임스탬프 포함하여 저장
             ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filepath = os.path.join(reports_dir, f"가격대별_거래분위_{ts}.html")
+            # 지역명 결정
+            if region_filter:
+                region_name = region_filter
+            elif "서울" in list_name and "수도권" in list_name:
+                region_name = "서울수도권"
+            else:
+                region_name = list_name.replace(" ", "_")
+            filepath = os.path.join(reports_dir, f"{region_name}_가격대별_거래분위_{ts}.html")
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(html_str)
 
@@ -8082,8 +8109,55 @@ class RealEstateMonitorApp:
             logging.error(f"가격대별 분위 HTML 저장 중 오류: {str(e)}")
             messagebox.showerror("오류", f"HTML 저장 실패: {str(e)}")
 
-    def build_price_distribution_html(self):
-        """현재 모니터링 중인 아파트 리스트의 거래 데이터를 사용하여 HTML 생성"""
+    def _show_region_selection_dialog(self):
+        """서울 수도권 리스트일 때 지역 선택 다이얼로그 표시"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("지역 선택")
+        dialog.geometry("300x250")
+        dialog.transient(self.root)
+        dialog.grab_set()
+
+        # 화면 중앙에 위치
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() - 300) // 2
+        y = (dialog.winfo_screenheight() - 250) // 2
+        dialog.geometry(f"+{x}+{y}")
+
+        result = {"value": "cancel"}
+
+        ttk.Label(dialog, text="가격대별 분위 분석 지역을 선택하세요",
+                  font=("맑은 고딕", 11, "bold")).pack(pady=15)
+
+        def select_region(region):
+            result["value"] = region
+            dialog.destroy()
+
+        btn_frame = ttk.Frame(dialog)
+        btn_frame.pack(pady=10, fill="x", padx=20)
+
+        ttk.Button(btn_frame, text="🗺️ 전체 (서울+경기+인천)",
+                   command=lambda: select_region(None), width=30).pack(pady=5)
+        ttk.Button(btn_frame, text="🏙️ 서울만",
+                   command=lambda: select_region("서울"), width=30).pack(pady=5)
+        ttk.Button(btn_frame, text="🏘️ 경기도만",
+                   command=lambda: select_region("경기"), width=30).pack(pady=5)
+        ttk.Button(btn_frame, text="🌊 인천만",
+                   command=lambda: select_region("인천"), width=30).pack(pady=5)
+
+        ttk.Separator(dialog, orient="horizontal").pack(fill="x", padx=20, pady=10)
+
+        ttk.Button(dialog, text="취소",
+                   command=lambda: select_region("cancel")).pack(pady=5)
+
+        dialog.wait_window()
+        return result["value"]
+
+    def build_price_distribution_html(self, region_filter=None):
+        """현재 모니터링 중인 아파트 리스트의 거래 데이터를 사용하여 HTML 생성
+
+        Args:
+            region_filter: 지역 필터 (None=전체, "서울", "경기", "인천")
+        """
         from html import escape
 
         # 모니터링 중인 아파트가 없으면 종료
@@ -8099,6 +8173,8 @@ class RealEstateMonitorApp:
         from dateutil.relativedelta import relativedelta
         six_months_ago = today - relativedelta(months=6)
         logging.info(f"[가격대별 분위] 거래 데이터 기간: {six_months_ago.strftime('%Y-%m-%d')} ~ {today.strftime('%Y-%m-%d')} (최근 6개월)")
+        if region_filter:
+            logging.info(f"[가격대별 분위] 지역 필터: {region_filter}")
 
         # 현재 활성 리스트 이름 가져오기
         list_name = "모니터링 리스트"
@@ -8113,6 +8189,10 @@ class RealEstateMonitorApp:
         except:
             pass
 
+        # 지역 필터가 있으면 리스트 이름에 추가
+        if region_filter:
+            list_name = f"{list_name} ({region_filter})"
+
         logging.info(f"[가격대별 분위] 활성 리스트: {list_name}")
         logging.info(f"[가격대별 분위] 모니터링 중인 아파트 수: {len(self.monitored_apts)}개")
 
@@ -8120,15 +8200,50 @@ class RealEstateMonitorApp:
             # 중복 제거를 위한 Set
             seen_trades = set()
 
+            # 지역 필터 디버깅: 첫 번째 아파트 정보 확인
+            if region_filter and self.monitored_apts:
+                sample_apt = self.monitored_apts[0]
+                logging.info(f"[가격대별 분위] 샘플 아파트 키: {list(sample_apt.keys())}")
+                logging.info(f"[가격대별 분위] 샘플 sigungu: '{sample_apt.get('sigungu', '')}'")
+                logging.info(f"[가격대별 분위] 샘플 address: '{sample_apt.get('address', '')}'")
+                logging.info(f"[가격대별 분위] 샘플 sido: '{sample_apt.get('sido', '')}'")
+
             # 각 모니터링 아파트의 거래 데이터 수집
             for apt_info in self.monitored_apts:
                 apt_name = apt_info.get('apt_name', '')
                 sigungu = apt_info.get('sigungu', '')
                 dong = apt_info.get('dong', '')
+                address = apt_info.get('address', '')  # 주소 필드도 확인
+                sido = apt_info.get('sido', '')  # 시도 필드도 확인
                 trade_data = apt_info.get('trade_data', [])
 
                 if not trade_data:
                     continue
+
+                # 지역 필터 적용 - 주소(address), 시도(sido), 시군구(sigungu) 순서로 체크
+                if region_filter:
+                    # 지역 정보 확인을 위한 문자열 결합
+                    location_str = f"{sido} {sigungu} {address}".lower()
+
+                    if region_filter == "서울":
+                        if "서울" not in location_str:
+                            continue
+                    elif region_filter == "경기":
+                        if "경기" not in location_str:
+                            continue
+                    elif region_filter == "인천":
+                        if "인천" not in location_str:
+                            continue
+
+                # 해당 아파트의 최고가 찾기 (신고가 판별용)
+                max_price_for_apt = 0
+                for t in trade_data:
+                    try:
+                        p = t.get('price', 0)
+                        if isinstance(p, (int, float)) and p > max_price_for_apt:
+                            max_price_for_apt = int(p)
+                    except:
+                        pass
 
                 # 거래 데이터 파싱
                 for trade in trade_data:
@@ -8189,6 +8304,9 @@ class RealEstateMonitorApp:
 
                         seen_trades.add(trade_key)
 
+                        # 신고가 여부 판별
+                        is_highest = (deal_amount == max_price_for_apt)
+
                         # 거래 데이터 추가
                         all_trades.append({
                             'date': trade_date_str,
@@ -8198,7 +8316,8 @@ class RealEstateMonitorApp:
                             'sigungu': sigungu,
                             'area': str(area) if area else '',
                             'floor': str(floor) if floor else '',
-                            'trade_dong': str(trade_dong) if trade_dong else ''
+                            'trade_dong': str(trade_dong) if trade_dong else '',
+                            'is_highest': is_highest
                         })
 
                     except Exception as e:
@@ -8256,7 +8375,7 @@ class RealEstateMonitorApp:
         <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>가격대별 거래 분위 분석</title>
+        <title>{escape(list_name)} 가격대별 거래 분위 분석</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
         <style>
           * {{ margin:0; padding:0; box-sizing:border-box; }}
@@ -8466,18 +8585,67 @@ class RealEstateMonitorApp:
           .trade-table tr:hover {{
             background:#f8f9fa;
           }}
+          .trade-table tr.highest-price {{
+            background:linear-gradient(90deg, #fff3cd 0%, #ffeeba 100%);
+            border-left:4px solid #ffc107;
+          }}
+          .trade-table tr.highest-price:hover {{
+            background:linear-gradient(90deg, #ffecb5 0%, #ffe8a1 100%);
+          }}
+          .trade-table tr.highest-price td {{
+            font-weight:600;
+          }}
+          .highest-badge {{
+            display:inline-block;
+            background:linear-gradient(135deg, #f59e0b, #d97706);
+            color:#fff;
+            padding:2px 8px;
+            border-radius:12px;
+            font-size:0.75em;
+            font-weight:bold;
+            margin-left:8px;
+            vertical-align:middle;
+          }}
           .trade-count {{
             color:#667eea;
             font-weight:bold;
             font-size:1.1em;
             margin-bottom:10px;
           }}
+          .highest-count {{
+            color:#f59e0b;
+            font-weight:bold;
+            margin-left:15px;
+          }}
+          .sort-buttons {{
+            display:flex;
+            gap:8px;
+            margin:10px 0 15px 0;
+          }}
+          .sort-btn {{
+            padding:6px 14px;
+            border:2px solid #ddd;
+            border-radius:20px;
+            background:#fff;
+            cursor:pointer;
+            font-size:0.85em;
+            transition:all 0.2s;
+          }}
+          .sort-btn:hover {{
+            border-color:#667eea;
+            color:#667eea;
+          }}
+          .sort-btn.active {{
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            color:#fff;
+            border-color:transparent;
+          }}
         </style>
         </head>
         <body>
         <div class="container">
           <div class="header">
-            <h1>📊 가격대별 거래 분위 분석</h1>
+            <h1>📊 {escape(list_name)} 가격대별 거래 분위 분석</h1>
             <p class="subtitle">{escape(list_name)} - 최근 3개월 거래 데이터</p>
             <p class="date-info">생성 시간: {escape(now)} | 데이터: {min_date_str} ~ {max_date_str} ({len(all_trades):,}건)</p>
           </div>
@@ -8644,6 +8812,10 @@ class RealEstateMonitorApp:
             showTradeModal(priceLabel, periodLabel, filteredTrades);
           }}
 
+          // 현재 모달에 표시중인 거래 데이터 (정렬용)
+          let currentModalTrades = [];
+          let currentSortType = 'date';  // 기본 정렬: 날짜순
+
           // 거래 내역 모달 표시
           function showTradeModal(priceLabel, periodLabel, trades) {{
             const modal = document.getElementById('tradeModal');
@@ -8652,12 +8824,60 @@ class RealEstateMonitorApp:
 
             modalTitle.textContent = `${{priceLabel}} 거래 내역 (${{periodLabel}})`;
 
+            // 현재 거래 데이터 저장
+            currentModalTrades = [...trades];
+            currentSortType = 'date';  // 기본값 날짜순
+
+            // 테이블 렌더링
+            renderTradeTable('date');
+
+            modal.style.display = 'block';
+          }}
+
+          // 정렬 방식에 따라 테이블 렌더링
+          function renderTradeTable(sortType) {{
+            const tradeList = document.getElementById('tradeList');
+            const trades = [...currentModalTrades];
+            currentSortType = sortType;
+
+            // 신고가 거래 수 계산
+            const highestCount = trades.filter(t => t.is_highest).length;
+
             // 거래 내역 테이블 생성
-            let html = `<div class="trade-count">총 ${{trades.length}}건의 거래</div>`;
+            let html = `<div class="trade-count">총 ${{trades.length}}건의 거래`;
+            if (highestCount > 0) {{
+              html += `<span class="highest-count">🏆 신고가 ${{highestCount}}건</span>`;
+            }}
+            html += `</div>`;
+
+            // 정렬 버튼 추가
+            html += `
+              <div class="sort-buttons">
+                <button class="sort-btn ${{sortType === 'date' ? 'active' : ''}}" onclick="renderTradeTable('date')">📅 날짜순</button>
+                <button class="sort-btn ${{sortType === 'price' ? 'active' : ''}}" onclick="renderTradeTable('price')">💰 가격순</button>
+                <button class="sort-btn ${{sortType === 'highest' ? 'active' : ''}}" onclick="renderTradeTable('highest')">🏆 신고가 우선</button>
+              </div>
+            `;
 
             if (trades.length === 0) {{
               html += '<p style="text-align:center; color:#999; padding:20px;">해당 기간에 거래 내역이 없습니다.</p>';
             }} else {{
+              // 정렬 적용
+              if (sortType === 'date') {{
+                // 날짜순 (최신순)
+                trades.sort((a, b) => new Date(b.date) - new Date(a.date));
+              }} else if (sortType === 'price') {{
+                // 가격순 (높은순)
+                trades.sort((a, b) => b.price - a.price);
+              }} else if (sortType === 'highest') {{
+                // 신고가 우선, 그 다음 날짜순
+                trades.sort((a, b) => {{
+                  if (a.is_highest && !b.is_highest) return -1;
+                  if (!a.is_highest && b.is_highest) return 1;
+                  return new Date(b.date) - new Date(a.date);
+                }});
+              }}
+
               html += `
                 <table class="trade-table">
                   <thead>
@@ -8675,20 +8895,21 @@ class RealEstateMonitorApp:
                   <tbody>
               `;
 
-              // 날짜순 정렬
-              trades.sort((a, b) => new Date(b.date) - new Date(a.date));
-
               trades.forEach(trade => {{
+                const rowClass = trade.is_highest ? 'highest-price' : '';
+                const badge = trade.is_highest ? '<span class="highest-badge">신고가</span>' : '';
+                const priceColor = trade.is_highest ? '#d97706' : '#667eea';
+
                 html += `
-                  <tr>
+                  <tr class="${{rowClass}}">
                     <td>${{trade.date}}</td>
                     <td>${{trade.sigungu || '-'}}</td>
                     <td>${{trade.dong || '-'}}</td>
-                    <td>${{trade.apt_name}}</td>
+                    <td>${{trade.apt_name}}${{badge}}</td>
                     <td>${{trade.area || '-'}}</td>
                     <td>${{trade.floor || '-'}}</td>
                     <td>${{trade.trade_dong || '-'}}</td>
-                    <td style="font-weight:bold; color:#667eea;">${{trade.price.toLocaleString()}}만원</td>
+                    <td style="font-weight:bold; color:${{priceColor}};">${{trade.price.toLocaleString()}}만원</td>
                   </tr>
                 `;
               }});
@@ -8700,7 +8921,6 @@ class RealEstateMonitorApp:
             }}
 
             tradeList.innerHTML = html;
-            modal.style.display = 'block';
           }}
 
           // 모달 닫기

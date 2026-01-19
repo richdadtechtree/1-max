@@ -8128,6 +8128,16 @@ class RealEstateMonitorApp:
                 if not trade_data:
                     continue
 
+                # 해당 아파트의 최고가 찾기 (신고가 판별용)
+                max_price_for_apt = 0
+                for t in trade_data:
+                    try:
+                        p = t.get('price', 0)
+                        if isinstance(p, (int, float)) and p > max_price_for_apt:
+                            max_price_for_apt = int(p)
+                    except:
+                        pass
+
                 # 거래 데이터 파싱
                 for trade in trade_data:
                     try:
@@ -8187,6 +8197,9 @@ class RealEstateMonitorApp:
 
                         seen_trades.add(trade_key)
 
+                        # 신고가 여부 판별
+                        is_highest = (deal_amount == max_price_for_apt)
+
                         # 거래 데이터 추가
                         all_trades.append({
                             'date': trade_date_str,
@@ -8196,7 +8209,8 @@ class RealEstateMonitorApp:
                             'sigungu': sigungu,
                             'area': str(area) if area else '',
                             'floor': str(floor) if floor else '',
-                            'trade_dong': str(trade_dong) if trade_dong else ''
+                            'trade_dong': str(trade_dong) if trade_dong else '',
+                            'is_highest': is_highest
                         })
 
                     except Exception as e:
@@ -8464,11 +8478,60 @@ class RealEstateMonitorApp:
           .trade-table tr:hover {{
             background:#f8f9fa;
           }}
+          .trade-table tr.highest-price {{
+            background:linear-gradient(90deg, #fff3cd 0%, #ffeeba 100%);
+            border-left:4px solid #ffc107;
+          }}
+          .trade-table tr.highest-price:hover {{
+            background:linear-gradient(90deg, #ffecb5 0%, #ffe8a1 100%);
+          }}
+          .trade-table tr.highest-price td {{
+            font-weight:600;
+          }}
+          .highest-badge {{
+            display:inline-block;
+            background:linear-gradient(135deg, #f59e0b, #d97706);
+            color:#fff;
+            padding:2px 8px;
+            border-radius:12px;
+            font-size:0.75em;
+            font-weight:bold;
+            margin-left:8px;
+            vertical-align:middle;
+          }}
           .trade-count {{
             color:#667eea;
             font-weight:bold;
             font-size:1.1em;
             margin-bottom:10px;
+          }}
+          .highest-count {{
+            color:#f59e0b;
+            font-weight:bold;
+            margin-left:15px;
+          }}
+          .sort-buttons {{
+            display:flex;
+            gap:8px;
+            margin:10px 0 15px 0;
+          }}
+          .sort-btn {{
+            padding:6px 14px;
+            border:2px solid #ddd;
+            border-radius:20px;
+            background:#fff;
+            cursor:pointer;
+            font-size:0.85em;
+            transition:all 0.2s;
+          }}
+          .sort-btn:hover {{
+            border-color:#667eea;
+            color:#667eea;
+          }}
+          .sort-btn.active {{
+            background:linear-gradient(135deg,#667eea,#764ba2);
+            color:#fff;
+            border-color:transparent;
           }}
         </style>
         </head>
@@ -8642,6 +8705,10 @@ class RealEstateMonitorApp:
             showTradeModal(priceLabel, periodLabel, filteredTrades);
           }}
 
+          // 현재 모달에 표시중인 거래 데이터 (정렬용)
+          let currentModalTrades = [];
+          let currentSortType = 'date';  // 기본 정렬: 날짜순
+
           // 거래 내역 모달 표시
           function showTradeModal(priceLabel, periodLabel, trades) {{
             const modal = document.getElementById('tradeModal');
@@ -8650,12 +8717,60 @@ class RealEstateMonitorApp:
 
             modalTitle.textContent = `${{priceLabel}} 거래 내역 (${{periodLabel}})`;
 
+            // 현재 거래 데이터 저장
+            currentModalTrades = [...trades];
+            currentSortType = 'date';  // 기본값 날짜순
+
+            // 테이블 렌더링
+            renderTradeTable('date');
+
+            modal.style.display = 'block';
+          }}
+
+          // 정렬 방식에 따라 테이블 렌더링
+          function renderTradeTable(sortType) {{
+            const tradeList = document.getElementById('tradeList');
+            const trades = [...currentModalTrades];
+            currentSortType = sortType;
+
+            // 신고가 거래 수 계산
+            const highestCount = trades.filter(t => t.is_highest).length;
+
             // 거래 내역 테이블 생성
-            let html = `<div class="trade-count">총 ${{trades.length}}건의 거래</div>`;
+            let html = `<div class="trade-count">총 ${{trades.length}}건의 거래`;
+            if (highestCount > 0) {{
+              html += `<span class="highest-count">🏆 신고가 ${{highestCount}}건</span>`;
+            }}
+            html += `</div>`;
+
+            // 정렬 버튼 추가
+            html += `
+              <div class="sort-buttons">
+                <button class="sort-btn ${{sortType === 'date' ? 'active' : ''}}" onclick="renderTradeTable('date')">📅 날짜순</button>
+                <button class="sort-btn ${{sortType === 'price' ? 'active' : ''}}" onclick="renderTradeTable('price')">💰 가격순</button>
+                <button class="sort-btn ${{sortType === 'highest' ? 'active' : ''}}" onclick="renderTradeTable('highest')">🏆 신고가 우선</button>
+              </div>
+            `;
 
             if (trades.length === 0) {{
               html += '<p style="text-align:center; color:#999; padding:20px;">해당 기간에 거래 내역이 없습니다.</p>';
             }} else {{
+              // 정렬 적용
+              if (sortType === 'date') {{
+                // 날짜순 (최신순)
+                trades.sort((a, b) => new Date(b.date) - new Date(a.date));
+              }} else if (sortType === 'price') {{
+                // 가격순 (높은순)
+                trades.sort((a, b) => b.price - a.price);
+              }} else if (sortType === 'highest') {{
+                // 신고가 우선, 그 다음 날짜순
+                trades.sort((a, b) => {{
+                  if (a.is_highest && !b.is_highest) return -1;
+                  if (!a.is_highest && b.is_highest) return 1;
+                  return new Date(b.date) - new Date(a.date);
+                }});
+              }}
+
               html += `
                 <table class="trade-table">
                   <thead>
@@ -8673,20 +8788,21 @@ class RealEstateMonitorApp:
                   <tbody>
               `;
 
-              // 날짜순 정렬
-              trades.sort((a, b) => new Date(b.date) - new Date(a.date));
-
               trades.forEach(trade => {{
+                const rowClass = trade.is_highest ? 'highest-price' : '';
+                const badge = trade.is_highest ? '<span class="highest-badge">신고가</span>' : '';
+                const priceColor = trade.is_highest ? '#d97706' : '#667eea';
+
                 html += `
-                  <tr>
+                  <tr class="${{rowClass}}">
                     <td>${{trade.date}}</td>
                     <td>${{trade.sigungu || '-'}}</td>
                     <td>${{trade.dong || '-'}}</td>
-                    <td>${{trade.apt_name}}</td>
+                    <td>${{trade.apt_name}}${{badge}}</td>
                     <td>${{trade.area || '-'}}</td>
                     <td>${{trade.floor || '-'}}</td>
                     <td>${{trade.trade_dong || '-'}}</td>
-                    <td style="font-weight:bold; color:#667eea;">${{trade.price.toLocaleString()}}만원</td>
+                    <td style="font-weight:bold; color:${{priceColor}};">${{trade.price.toLocaleString()}}만원</td>
                   </tr>
                 `;
               }});
@@ -8698,7 +8814,6 @@ class RealEstateMonitorApp:
             }}
 
             tradeList.innerHTML = html;
-            modal.style.display = 'block';
           }}
 
           // 모달 닫기

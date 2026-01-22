@@ -1382,7 +1382,107 @@ class RealEstateMonitorApp:
             # 기본 골격 반환
             return {"lists": {"기본": []}, "active_list": "기본"}
 
-        
+    def merge_duplicate_apts(self, apt_list):
+        """동일한 아파트(이름+동+면적)를 병합하여 거래 데이터 통합 및 최고가 재계산
+
+        분양권 거래와 준공후 거래가 따로 등록된 경우 하나로 합침
+        - 단지명의 공백 차이도 같은 단지로 인식 (예: '청라언덕역 서한포레스트' = '청라언덕역서한포레스트')
+        """
+        if not apt_list:
+            return apt_list
+
+        import re
+
+        def normalize_name(name):
+            """단지명 정규화: 공백 제거, 소문자 변환"""
+            if not name:
+                return ''
+            # 모든 공백 제거
+            return re.sub(r'\s+', '', str(name).strip())
+
+        def normalize_area(area):
+            """면적 정규화: 숫자만 추출하여 정수로 변환"""
+            if not area:
+                return '0'
+            # 숫자와 소수점만 추출
+            area_str = re.sub(r'[^\d.]', '', str(area))
+            try:
+                # 정수로 반올림 (84.97 -> 85, 84.12 -> 84)
+                return str(int(round(float(area_str)))) if area_str else '0'
+            except:
+                return '0'
+
+        merged = {}
+        for apt in apt_list:
+            # 고유 키: 정규화된 아파트명 + 동 + 정규화된 면적
+            key = (
+                normalize_name(apt.get('apt_name', '')),
+                apt.get('dong', '').strip(),
+                normalize_area(apt.get('area', ''))
+            )
+
+            if key not in merged:
+                merged[key] = apt.copy()
+                # trade_data가 없으면 빈 리스트로 초기화
+                if 'trade_data' not in merged[key]:
+                    merged[key]['trade_data'] = []
+            else:
+                # 중복 발견 - 거래 데이터 병합
+                existing = merged[key]
+                new_trades = apt.get('trade_data', [])
+
+                # 기존 거래 데이터의 키 세트 생성 (중복 방지)
+                existing_keys = set()
+                for t in existing.get('trade_data', []):
+                    if isinstance(t.get('date'), datetime):
+                        t_key = (t['date'].year, t['date'].month, t.get('day', 1),
+                                 t.get('price', 0), t.get('floor', 0))
+                    else:
+                        t_key = (str(t.get('date', '')), t.get('price', 0), t.get('floor', 0))
+                    existing_keys.add(t_key)
+
+                # 새 거래 데이터 추가 (중복 제외)
+                for t in new_trades:
+                    if isinstance(t.get('date'), datetime):
+                        t_key = (t['date'].year, t['date'].month, t.get('day', 1),
+                                 t.get('price', 0), t.get('floor', 0))
+                    else:
+                        t_key = (str(t.get('date', '')), t.get('price', 0), t.get('floor', 0))
+
+                    if t_key not in existing_keys:
+                        existing['trade_data'].append(t)
+                        existing_keys.add(t_key)
+
+                # 최고가 재계산
+                all_trades = existing.get('trade_data', [])
+                if all_trades:
+                    max_trade = max(all_trades, key=lambda x: x.get('price', 0))
+                    max_price = max_trade.get('price', 0)
+
+                    # 기존 최고가보다 높으면 업데이트
+                    if max_price > existing.get('last_max_price', 0):
+                        if isinstance(max_trade.get('date'), datetime):
+                            max_date = max_trade['date'].strftime('%Y-%m-%d')
+                        else:
+                            max_date = str(max_trade.get('date', ''))
+
+                        existing['prev_max_price'] = max_price
+                        existing['prev_max_date'] = max_date
+                        existing['prev_max_floor'] = max_trade.get('floor', '')
+                        existing['prev_max_dong'] = max_trade.get('dong', '-')
+                        existing['last_max_price'] = max_price
+                        existing['max_price_date'] = max_date
+                        existing['max_price_floor'] = max_trade.get('floor', '')
+                        existing['max_price_dong'] = max_trade.get('dong', '-')
+
+                logging.info(f"[중복 병합] {apt.get('apt_name')} {apt.get('area')}㎡ - 거래 데이터 통합됨")
+
+        result = list(merged.values())
+        if len(result) < len(apt_list):
+            logging.info(f"[중복 병합] {len(apt_list)}개 -> {len(result)}개로 병합됨 ({len(apt_list) - len(result)}개 중복 제거)")
+
+        return result
+
     def save_monitored_apts(self):
         """모니터링 리스트를 DB에 저장 (동적 스키마 감지)"""
         try:
@@ -1400,6 +1500,10 @@ class RealEstateMonitorApp:
 
             # 각 리스트 저장
             for list_name, apt_list in self.monitored_lists["lists"].items():
+                # ★ 저장 전 중복 아파트 병합 (분양권+준공후 거래 통합)
+                apt_list = self.merge_duplicate_apts(apt_list)
+                self.monitored_lists["lists"][list_name] = apt_list
+
                 # 리스트가 존재하는지 확인
                 cursor.execute("SELECT id FROM monitoring_lists WHERE name = ?", (list_name,))
                 result = cursor.fetchone()
@@ -4890,6 +4994,15 @@ class RealEstateMonitorApp:
                     self.monitored_apts.extend(new_complexes)
                     debug_text.insert('end', f"\n총 {len(new_complexes)}개 신규 단지 추가됨\n")
 
+                # ★ 중복 아파트 병합 (분양권+준공후 거래 통합)
+                before_count = len(self.monitored_apts)
+                self.monitored_apts = self.merge_duplicate_apts(self.monitored_apts)
+                # monitored_lists에도 반영
+                self.monitored_lists["lists"][self.active_list.get()] = self.monitored_apts
+                after_count = len(self.monitored_apts)
+                if before_count > after_count:
+                    debug_text.insert('end', f"중복 병합: {before_count}개 -> {after_count}개 ({before_count - after_count}개 통합)\n")
+
                 # ★ 5단계: 연식 없는 단지들만 배치로 연식 조회
                 debug_text.insert('end', "\n=== 4단계: 연식 정보 보정 ===\n")
                 debug_text.see('end')
@@ -5483,9 +5596,27 @@ class RealEstateMonitorApp:
             if isinstance(region_59_rank_val, dict):
                 region_59_rank_val = ""
 
-            # 카카오맵 검색용 쿼리 (동 + 아파트명 + 아파트) - 괄호 이전까지만 사용
-            apt_name_for_search = name.split('(')[0].strip() if '(' in name else name
-            kakao_query = f"{location_dong} {apt_name_for_search} 아파트".strip() if location_dong else f"{apt_name_for_search} 아파트"
+            # 카카오맵 검색용 쿼리 (시군구 + 동 + 아파트명 + 아파트)
+            # 괄호 안에 한글이 있으면 살리고, 숫자/기호만 있으면 제외
+            import re
+            if '(' in name:
+                match = re.search(r'\(([^)]+)\)', name)
+                if match:
+                    paren_content = match.group(1)
+                    # 괄호 안에 한글이 있는지 확인
+                    if re.search(r'[가-힣]', paren_content):
+                        # 한글이 있으면 괄호 내용 중 한글만 추출하여 붙임
+                        korean_only = re.sub(r'[^가-힣\s]', '', paren_content).strip()
+                        apt_name_for_search = name.split('(')[0].strip() + ' ' + korean_only
+                    else:
+                        # 한글 없으면 괄호 앞부분만
+                        apt_name_for_search = name.split('(')[0].strip()
+                else:
+                    apt_name_for_search = name.split('(')[0].strip()
+            else:
+                apt_name_for_search = name
+            # 시군구 + 동 + 아파트명으로 검색 (동일 단지명 구분을 위해)
+            kakao_query = f"{sigungu} {location_dong} {apt_name_for_search} 아파트".strip()
 
             card = f"""
             <section class="card" data-region="{sido} {region_for_filter}"
@@ -7173,9 +7304,24 @@ class RealEstateMonitorApp:
                         except:
                             build_year_str = f'<span class="year-badge">{build_year}년</span>'
 
-            # 카카오맵 검색용 쿼리 (동 + 아파트명 + 아파트) - 괄호 이전까지만 사용
-            apt_name_for_search = apt['apt_name'].split('(')[0].strip() if '(' in apt['apt_name'] else apt['apt_name']
-            kakao_query = f"{location_dong} {apt_name_for_search} 아파트".strip() if location_dong else f"{apt_name_for_search} 아파트"
+            # 카카오맵 검색용 쿼리 (시군구 + 동 + 아파트명 + 아파트)
+            # 괄호 안에 한글이 있으면 살리고, 숫자/기호만 있으면 제외
+            apt_name_raw = apt['apt_name']
+            if '(' in apt_name_raw:
+                match = re.search(r'\(([^)]+)\)', apt_name_raw)
+                if match:
+                    paren_content = match.group(1)
+                    if re.search(r'[가-힣]', paren_content):
+                        korean_only = re.sub(r'[^가-힣\s]', '', paren_content).strip()
+                        apt_name_for_search = apt_name_raw.split('(')[0].strip() + ' ' + korean_only
+                    else:
+                        apt_name_for_search = apt_name_raw.split('(')[0].strip()
+                else:
+                    apt_name_for_search = apt_name_raw.split('(')[0].strip()
+            else:
+                apt_name_for_search = apt_name_raw
+            # 시군구 + 동 + 아파트명으로 검색 (동일 단지명 구분을 위해)
+            kakao_query = f"{sigungu} {location_dong} {apt_name_for_search} 아파트".strip()
 
             cards_html += f"""
             <div class="card" data-price-range="{price_range}" data-kakao-query="{escape(kakao_query)}" onclick="openKakaoMap(this)" style="cursor:pointer;">
@@ -8049,22 +8195,19 @@ class RealEstateMonitorApp:
     def export_price_distribution_html(self):
         """모니터링 중인 단지들의 저장된 거래 데이터를 기반으로 가격대별 분위 HTML 생성"""
         try:
-            # 현재 활성 리스트 이름 확인
-            list_name = ""
-            try:
-                conn = sqlite3.connect(self.db_path)
-                cursor = conn.cursor()
-                cursor.execute("SELECT name FROM monitoring_lists WHERE is_active = 1")
-                row = cursor.fetchone()
-                if row:
-                    list_name = row[0]
-                conn.close()
-            except:
-                pass
+            # 현재 활성 리스트 이름 확인 - self.active_list (tk.StringVar) 사용
+            list_name = self.active_list.get() if hasattr(self, 'active_list') else ""
+            logging.info(f"[가격대별 분위] active_list에서 가져온 리스트: '{list_name}'")
 
-            # 서울 수도권인 경우 지역 선택 다이얼로그 표시
+            # 서울 수도권인 경우에만 지역 선택 다이얼로그 표시
             region_filter = None  # None이면 전체
-            if "서울" in list_name and "수도권" in list_name:
+            logging.info(f"[가격대별 분위] 현재 리스트: '{list_name}'")
+
+            # 서울과 수도권이 모두 포함된 경우에만 True
+            is_seoul_sudogwon = ("서울" in list_name) and ("수도권" in list_name)
+            logging.info(f"[가격대별 분위] 서울수도권 여부: {is_seoul_sudogwon}")
+
+            if is_seoul_sudogwon:
                 region_filter = self._show_region_selection_dialog()
                 if region_filter == "cancel":
                     return  # 사용자가 취소함
@@ -8176,18 +8319,8 @@ class RealEstateMonitorApp:
         if region_filter:
             logging.info(f"[가격대별 분위] 지역 필터: {region_filter}")
 
-        # 현재 활성 리스트 이름 가져오기
-        list_name = "모니터링 리스트"
-        try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM monitoring_lists WHERE is_active = 1")
-            row = cursor.fetchone()
-            if row:
-                list_name = row[0]
-            conn.close()
-        except:
-            pass
+        # 현재 활성 리스트 이름 가져오기 - self.active_list (tk.StringVar) 사용
+        list_name = self.active_list.get() if hasattr(self, 'active_list') else "모니터링 리스트"
 
         # 지역 필터가 있으면 리스트 이름에 추가
         if region_filter:

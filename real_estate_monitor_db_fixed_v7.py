@@ -6998,6 +6998,7 @@ class RealEstateMonitorApp:
         """모니터링 중인 모든 아파트를 대상으로 평형별 가격 순위 HTML 생성
         area_type: '84' 또는 '59'
         """
+        import re
         from html import escape
 
         # DB에서 모니터링 중인 모든 아파트 조회

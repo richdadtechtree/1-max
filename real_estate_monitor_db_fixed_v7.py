@@ -8527,6 +8527,18 @@ class RealEstateMonitorApp:
             padding:40px;
             box-shadow:0 20px 60px rgba(0,0,0,0.3);
           }}
+          .created-date {{
+            position:fixed;
+            top:10px;
+            right:20px;
+            background:rgba(255,255,255,0.95);
+            padding:8px 16px;
+            border-radius:8px;
+            font-size:12px;
+            color:#666;
+            box-shadow:0 2px 10px rgba(0,0,0,0.1);
+            z-index:1000;
+          }}
           .header {{
             text-align:center;
             margin-bottom:40px;
@@ -8777,6 +8789,7 @@ class RealEstateMonitorApp:
         </style>
         </head>
         <body>
+        <div class="created-date">📅 제작일: {escape(now)}</div>
         <div class="container">
           <div class="header">
             <h1>📊 {escape(list_name)} 가격대별 거래 분위 분석</h1>
@@ -9238,7 +9251,7 @@ class RealEstateMonitorApp:
                     }},
                     y: {{
                       type: 'logarithmic',
-                      min: 1,
+                      min: 0.5,  // 1건짜리 바도 보이게 (min:1이면 1건은 높이가 0)
                       grid: {{
                         color: 'rgba(0, 0, 0, 0.05)'
                       }},

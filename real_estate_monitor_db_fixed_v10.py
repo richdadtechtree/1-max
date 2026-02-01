@@ -2309,7 +2309,7 @@ class RealEstateMonitorApp:
         ttk.Button(btns, text="데이터 갱신", style='Accent.TButton', command=self.update_all_data).pack(side="right", padx=5)
         ttk.Button(btns, text="🔍 신고가 다시 찾기", style='Accent.TButton', command=self.recheck_max_prices).pack(side="right", padx=5)
         ttk.Button(btns, text="📈 가격대별 분위", style='Accent.TButton', command=self.export_price_distribution_html).pack(side="right", padx=5)
-        ttk.Button(btns, text="🧭 공포탐욕지수", style='Accent.TButton', command=self.export_fear_greed_html).pack(side="right", padx=5)
+        ttk.Button(btns, text="🧭 부동산 최신 근황", style='Accent.TButton', command=self.export_fear_greed_html).pack(side="right", padx=5)
         ttk.Button(btns, text="📊 거래량 순위", style='Accent.TButton', command=self.export_trade_volume_ranking_html).pack(side="right", padx=5)
         ttk.Button(btns, text="🏆 59㎡ 순위", style='Accent.TButton', command=lambda: self.export_area_ranking_html('59')).pack(side="right", padx=5)
         ttk.Button(btns, text="🏆 84㎡ 순위", style='Accent.TButton', command=lambda: self.export_area_ranking_html('84')).pack(side="right", padx=5)
@@ -7445,7 +7445,7 @@ class RealEstateMonitorApp:
               <!-- 카드가 JavaScript에서 동적으로 생성됩니다 -->
               <div id="loadingIndicator" style="text-align:center; padding:40px; color:#666;">
                 <div style="font-size:24px; margin-bottom:10px;">⏳</div>
-                <div>데이터 로딩 중...</div>
+                <div id="loadingProgress">데이터 로딩 중... 0%</div>
               </div>
             </section>
 
@@ -7502,10 +7502,18 @@ class RealEstateMonitorApp:
           return 'over30';
         }}
 
+        // 시군구에서 지역 접미사 제거 함수 (예: "서구(인)" -> "서구")
+        function cleanSigungu(sigungu) {{
+          if (!sigungu) return '';
+          // (서), (경), (인) 등 괄호로 감싸진 한글 약어 제거
+          return sigungu.replace(/\([가-힣]\)$/g, '').trim();
+        }}
+
         // 카드 HTML 생성 함수
         function createCardHTML(apt) {{
           const aptName = apt[0] >= 0 ? aptNames[apt[0]] : '';
-          const sigungu = apt[1] >= 0 ? sigungus[apt[1]] : '';
+          const sigunguRaw = apt[1] >= 0 ? sigungus[apt[1]] : '';
+          const sigungu = cleanSigungu(sigunguRaw);  // 표시용 - 접미사 제거
           const dong = apt[2] >= 0 ? dongs[apt[2]] : '';
           const locationDong = apt[3] >= 0 ? locationDongs[apt[3]] : '';
           const price = apt[4];
@@ -7624,35 +7632,47 @@ class RealEstateMonitorApp:
 
         // 카드 렌더링 (Lazy Loading - 청크 단위)
         let renderedCount = 0;
-        const CHUNK_SIZE = 100;
+        const CHUNK_SIZE = 200;  // 성능 개선을 위해 청크 크기 증가
         let allCards = [];
         let currentRange = 'all';
         let searchQuery = '';
+        let isRenderingComplete = false;
 
         function renderChunk() {{
           const cardsContainer = document.getElementById('cards');
           const end = Math.min(renderedCount + CHUNK_SIZE, compressedApts.length);
 
+          // DocumentFragment 사용하여 성능 개선
+          const fragment = document.createDocumentFragment();
+          const tempDiv = document.createElement('div');
+
           for (let i = renderedCount; i < end; i++) {{
             const cardHTML = createCardHTML(compressedApts[i]);
-            allCards.push(cardHTML);
+            tempDiv.innerHTML = cardHTML;
+            while (tempDiv.firstChild) {{
+              fragment.appendChild(tempDiv.firstChild);
+            }}
           }}
 
-          if (renderedCount === 0) {{
-            // 첫 번째 청크: 로딩 표시 제거하고 카드 표시
-            cardsContainer.innerHTML = allCards.join('');
-          }} else {{
-            // 추가 청크: 기존에 추가
-            cardsContainer.innerHTML = allCards.join('');
-          }}
-
+          // fragment를 추가 (DOM 조작 1회로 축소)
+          cardsContainer.appendChild(fragment);
           renderedCount = end;
+
+          // 진행률 표시
+          const loadingIndicator = document.getElementById('loadingIndicator');
+          const progress = Math.round(renderedCount / compressedApts.length * 100);
+          if (loadingIndicator) {{
+            const progressEl = document.getElementById('loadingProgress');
+            if (progressEl) progressEl.textContent = `로딩 중... ${{progress}}%`;
+          }}
 
           if (renderedCount < compressedApts.length) {{
             // 다음 청크 예약
             requestAnimationFrame(renderChunk);
           }} else {{
-            // 렌더링 완료 - 필터 초기화
+            // 렌더링 완료 - 로딩 인디케이터 숨기기
+            if (loadingIndicator) loadingIndicator.style.display = 'none';
+            isRenderingComplete = true;
             applyFilters();
             console.log('[평형별 순위] 렌더링 완료:', renderedCount, '개');
           }}
@@ -7691,7 +7711,10 @@ class RealEstateMonitorApp:
           document.querySelectorAll('.price-btn').forEach(btn => {{
             btn.classList.toggle('active', btn.dataset.range === range);
           }});
-          applyFilters();
+          // 렌더링 완료 후에만 필터 적용
+          if (isRenderingComplete) {{
+            applyFilters();
+          }}
         }}
 
         // 이벤트 리스너 설정
@@ -7705,14 +7728,14 @@ class RealEstateMonitorApp:
         searchInput.addEventListener('input', (e) => {{
           searchQuery = e.target.value.trim();
           searchClear.classList.toggle('show', !!searchQuery);
-          applyFilters();
+          if (isRenderingComplete) applyFilters();
         }});
 
         searchClear.addEventListener('click', () => {{
           searchInput.value = '';
           searchQuery = '';
           searchClear.classList.remove('show');
-          applyFilters();
+          if (isRenderingComplete) applyFilters();
         }});
 
         // 페이지 로드 시 렌더링 시작
@@ -8322,8 +8345,12 @@ class RealEstateMonitorApp:
 
     def get_region_tier(self, sigungu):
         """시군구명으로 티어 찾기"""
-        # 시군구명 정규화 (인천광역시 -> 인천)
-        normalized = sigungu.replace('광역시', '').replace('특별시', '').strip()
+        import re
+        # 시군구명 정규화
+        # 1. (서), (경), (인) 등 지역 접미사 제거
+        normalized = re.sub(r'\([가-힣]\)$', '', sigungu).strip()
+        # 2. 광역시/특별시 제거
+        normalized = normalized.replace('광역시', '').replace('특별시', '').strip()
 
         for tier, data in self.REGION_TIERS.items():
             for region in data['regions']:
@@ -8419,7 +8446,7 @@ class RealEstateMonitorApp:
             'tiers': tier_indices
         }
 
-    def build_fear_greed_html(self):
+    def build_fear_greed_html(self, hotplace_region='', hotplace_rate=''):
         """공포 탐욕지수 HTML 생성 (가격대별 분위와 동일한 데이터 수집 방식)"""
         from html import escape
 
@@ -8451,17 +8478,14 @@ class RealEstateMonitorApp:
             if not trade_data:
                 continue
 
-            # 모니터링 아파트의 '최근신고가'를 기준으로 신고가 판별
+            # 모니터링 아파트의 '최근신고가 날짜'를 기준으로 신고가 판별
             last_max_price = apt_info.get('last_max_price', 0)
-            if not last_max_price:
-                # last_max_price가 없으면 trade_data에서 최고가 찾기 (fallback)
-                for t in trade_data:
-                    try:
-                        p = t.get('price', 0)
-                        if isinstance(p, (int, float)) and p > last_max_price:
-                            last_max_price = int(p)
-                    except:
-                        pass
+            max_price_date = apt_info.get('max_price_date', '')
+            # 날짜 형식 통일 (YYYY-MM-DD)
+            if max_price_date:
+                max_price_date = str(max_price_date).replace('.', '-').replace('/', '-')
+                if ' ' in max_price_date:
+                    max_price_date = max_price_date.split()[0]
 
             for trade in trade_data:
                 try:
@@ -8495,37 +8519,56 @@ class RealEstateMonitorApp:
                         continue
                     seen_trades.add(trade_key)
 
-                    # 신고가 여부 판정 (모니터링 아파트의 last_max_price와 같으면 신고가)
-                    is_new_high = (deal_amount == last_max_price) and last_max_price > 0
+                    # 신고가 여부 판정
+                    # max_price_date가 있으면 날짜+가격 모두 일치, 없으면 가격만 비교
+                    if max_price_date:
+                        is_new_high = (trade_date_str == max_price_date) and (deal_amount == last_max_price) and last_max_price > 0
+                    else:
+                        is_new_high = (deal_amount == last_max_price) and last_max_price > 0
+
+                    # 구가 있으면 구 단위, 없으면 시+동 단위
+                    if '구' in sigungu:
+                        parts = sigungu.split()
+                        region_key = next((p for p in parts if '구' in p), sigungu)
+                    else:
+                        region_key = f"{sigungu.split()[0] if sigungu else ''} {dong}".strip() if dong else sigungu
+
+                    # 시도별 분류 (sido 필드 사용: 서울시, 경기도, 인천시)
+                    sido_lower = sido.lower() if sido else ''
+                    sigungu_lower = sigungu.lower() if sigungu else ''
+                    if '서울' in sido_lower or '서울' in sigungu_lower:
+                        sido_type = 0
+                    elif '인천' in sido_lower or '인천' in sigungu_lower:
+                        sido_type = 2
+                    else:
+                        sido_type = 1
+
+                    # 티어 결정 (get_region_tier 메서드 사용)
+                    tier = self.get_region_tier(sigungu)
+                    if tier is None:
+                        tier = 7  # 기본값
 
                     all_trades.append({
                         'date': trade_date_str,
                         'price': deal_amount,
                         'sigungu': sigungu,
-                        'is_new_high': is_new_high
+                        'dong': dong,
+                        'is_new_high': is_new_high,
+                        'region_key': region_key,
+                        'sido_type': sido_type,
+                        'tier': tier,
+                        'apt_name': apt_name
                     })
 
                     # 4주 이내 거래면 서울/경기/인천별 지역 집계
                     try:
                         trade_dt = datetime.strptime(trade_date_str, '%Y-%m-%d')
                         if trade_dt >= four_weeks_ago:
-                            # 구가 있으면 구 단위, 없으면 시+동 단위
-                            if '구' in sigungu:
-                                parts = sigungu.split()
-                                region_key = next((p for p in parts if '구' in p), sigungu)
-                            else:
-                                # 구가 없는 경우 (과천시 등) → 시+동
-                                region_key = f"{sigungu.split()[0] if sigungu else ''} {dong}".strip() if dong else sigungu
-
-                            # 시도별 분류 (sido 필드 사용: 서울시, 경기도, 인천시)
-                            sido_lower = sido.lower() if sido else ''
-                            sigungu_lower = sigungu.lower() if sigungu else ''
-
-                            if '서울' in sido_lower or '서울' in sigungu_lower:
+                            if sido_type == 0:
                                 seoul_trades_4w[region_key] += 1
-                            elif '인천' in sido_lower or '인천' in sigungu_lower:
+                            elif sido_type == 2:
                                 incheon_trades_4w[region_key] += 1
-                            else:  # 경기
+                            else:
                                 gyeonggi_trades_4w[region_key] += 1
                     except:
                         pass
@@ -8535,74 +8578,14 @@ class RealEstateMonitorApp:
         if not all_trades:
             return None
 
-        # 서울/경기/인천 각각 TOP 3
-        top3_seoul = sorted(seoul_trades_4w.items(), key=lambda x: x[1], reverse=True)[:3]
-        top3_gyeonggi = sorted(gyeonggi_trades_4w.items(), key=lambda x: x[1], reverse=True)[:3]
-        top3_incheon = sorted(incheon_trades_4w.items(), key=lambda x: x[1], reverse=True)[:3]
-
-        # 공포 탐욕지수 계산 (신고가 포함)
-        fg_data = self.calculate_fear_greed_index(all_trades)
-        overall_index = fg_data['overall']
-        tier_data = fg_data['tiers']
-
-        # 가장 신고가가 많은 티어 찾기
-        max_new_high = 0
-        max_tier = 1
-        for tier in range(1, 8):
-            new_highs = tier_data[tier]['new_highs_4w']
-            if new_highs > max_new_high:
-                max_new_high = new_highs
-                max_tier = tier
-
-        # 나침반 바늘 각도 계산 (7티어를 180도로 나눔)
-        # 1티어가 왼쪽 끝(-90도), 7티어가 오른쪽 끝(+90도)
-        needle_angle = -90 + (max_tier - 1) * (180 / 6)  # 6개 구간
-
-        # 상태 판정 (신고가 많은 티어 기준)
-        max_tier_color = self.REGION_TIERS[max_tier]['color']
-        max_tier_name = self.REGION_TIERS[max_tier]['name']
-
-        # 상태 판정 (신고가 개수 기준)
-        if max_new_high >= 20:
-            status = f"{max_tier_name} 신고가 폭발"
-            status_emoji = "🔥"
-        elif max_new_high >= 10:
-            status = f"{max_tier_name} 신고가 다수"
-            status_emoji = "📈"
-        elif max_new_high >= 5:
-            status = f"{max_tier_name} 신고가 보통"
-            status_emoji = "⚖️"
-        elif max_new_high >= 1:
-            status = f"{max_tier_name} 신고가 소수"
-            status_emoji = "📉"
-        else:
-            status = "신고가 없음"
-            status_emoji = "😴"
-
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         list_name = self.active_list.get() if hasattr(self, 'active_list') else "모니터링 리스트"
 
-        # 서울/경기/인천 각각 TOP 3 HTML 생성 (한 줄에 표시)
-        def make_top3_line(region_name, top3_list):
-            if not top3_list:
-                return f'<span class="top3-region">{region_name}</span><span class="top3-items">데이터 없음</span>'
-            items = []
-            for i, (region, count) in enumerate(top3_list):
-                medal = ["🥇", "🥈", "🥉"][i] if i < 3 else ""
-                items.append(f'{medal}{escape(region)}({count}건)')
-            return f'<span class="top3-region">{region_name}</span><span class="top3-items">{" | ".join(items)}</span>'
-
-        top3_html = f"""
-        <div class="top3-row">{make_top3_line("서울", top3_seoul)}</div>
-        <div class="top3-row">{make_top3_line("경기", top3_gyeonggi)}</div>
-        <div class="top3-row">{make_top3_line("인천", top3_incheon)}</div>
-        """
-
-        # 티어별 지역 목록 HTML 생성
+        # 티어별 지역 목록 HTML 생성 (정적)
         tier_regions_html = ""
         for tier in range(1, 8):
             tier_info = self.REGION_TIERS[tier]
-            regions = ", ".join(tier_info['regions'])  # 전체 표시
+            regions = ", ".join(tier_info['regions'])
             tier_regions_html += f"""
             <div class="tier-region-item">
               <div class="tier-color-dot" style="background:{tier_info['color']};"></div>
@@ -8612,42 +8595,21 @@ class RealEstateMonitorApp:
             </div>
             """
 
-        # 티어별 바 차트 데이터 생성 (신고가 기준)
-        tier_bars_html = ""
-        # 최대 신고가 개수로 비율 계산
-        all_new_highs = [tier_data[t]['new_highs_4w'] for t in range(1, 8)]
-        max_bar_value = max(all_new_highs) if max(all_new_highs) > 0 else 1
+        # JavaScript용 거래 데이터 JSON 생성 (all_trades에서 추출)
+        # 각 거래: [date, region_key, sido_type, is_new_high, tier, apt_name, sigungu, price, dong]
+        # sido_type: 0=서울, 1=경기, 2=인천
+        import json
+        trades_for_js = [
+            [t['date'], t['region_key'], t['sido_type'], 1 if t['is_new_high'] else 0, t['tier'], t.get('apt_name', ''), t.get('sigungu', ''), t.get('price', 0), t.get('dong', '')]
+            for t in all_trades
+        ]
+        trades_json = json.dumps(trades_for_js, ensure_ascii=False)
 
-        for tier in range(1, 8):
-            data = tier_data[tier]
-            new_highs = data['new_highs_4w']
-            trades_4w = data['trades_4w']
-            bar_width = (new_highs / max_bar_value) * 100 if max_bar_value > 0 else 0
-            bar_width = max(5, bar_width) if new_highs > 0 else 5
-
-            # 신고가 아이콘
-            if new_highs >= 10:
-                change_icon = "🔥"
-            elif new_highs >= 5:
-                change_icon = "📈"
-            elif new_highs >= 1:
-                change_icon = "✨"
-            else:
-                change_icon = "➖"
-
-            tier_bars_html += f"""
-            <div class="tier-row">
-              <div class="tier-label" style="background:{data['color']};">{data['name']}</div>
-              <div class="tier-bar-container">
-                <div class="tier-bar" style="width:{bar_width}%; background:{data['color']};"></div>
-              </div>
-              <div class="tier-stats">
-                <span class="change-icon">{change_icon}</span>
-                <span class="change-text">신고가 {new_highs}건</span>
-                <span class="trade-count">(총 {trades_4w}건)</span>
-              </div>
-            </div>
-            """
+        # 티어 정보 JSON
+        tier_info_json = json.dumps({
+            t: {'name': self.REGION_TIERS[t]['name'], 'color': self.REGION_TIERS[t]['color']}
+            for t in range(1, 8)
+        }, ensure_ascii=False)
 
         html_content = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -8774,6 +8736,51 @@ class RealEstateMonitorApp:
     margin-bottom:20px;
   }}
 
+  /* 이번주 핫플레이스 */
+  .hotplace-section {{
+    display:flex;
+    justify-content:center;
+    margin-bottom:25px;
+  }}
+  .hotplace-card {{
+    background:linear-gradient(135deg, rgba(255,107,107,0.15), rgba(255,142,83,0.15));
+    border:2px solid rgba(255,107,107,0.4);
+    border-radius:16px;
+    padding:20px 40px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }}
+  .hotplace-card::before {{
+    content:'🔥';
+    position:absolute;
+    top:-10px;
+    left:-10px;
+    font-size:60px;
+    opacity:0.15;
+  }}
+  .hotplace-label {{
+    font-size:13px;
+    color:rgba(255,255,255,0.7);
+    margin-bottom:8px;
+    font-weight:600;
+  }}
+  .hotplace-region {{
+    font-size:28px;
+    font-weight:800;
+    color:#FF6B6B;
+    text-shadow:0 0 20px rgba(255,107,107,0.5);
+    margin-bottom:5px;
+  }}
+  .hotplace-rate {{
+    font-size:18px;
+    font-weight:700;
+    color:#FFA94D;
+  }}
+  .hotplace-rate::before {{
+    content:'📈 ';
+  }}
+
   /* 워터마크 */
   .watermark {{
     position:fixed; top:0; left:0; width:100%; height:100%;
@@ -8883,10 +8890,22 @@ class RealEstateMonitorApp:
     height:120px;
     background:linear-gradient(to top, #fff, #ccc);
     transform-origin:bottom center;
-    transform:translateX(-50%) rotate({needle_angle}deg);
+    transform:translateX(-50%) rotate(0deg);
     border-radius:2px;
     box-shadow:0 0 10px rgba(255,255,255,0.5);
-    transition:transform 1s ease-out;
+  }}
+  .gauge-needle.spinning {{
+    animation: needleSpin 0.15s linear infinite;
+  }}
+  .gauge-needle.stopping {{
+    transition: transform 1.5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
+  }}
+  @keyframes needleSpin {{
+    0% {{ transform: translateX(-50%) rotate(-90deg); }}
+    25% {{ transform: translateX(-50%) rotate(0deg); }}
+    50% {{ transform: translateX(-50%) rotate(90deg); }}
+    75% {{ transform: translateX(-50%) rotate(0deg); }}
+    100% {{ transform: translateX(-50%) rotate(-90deg); }}
   }}
   .gauge-center {{
     position:absolute;
@@ -8922,12 +8941,13 @@ class RealEstateMonitorApp:
   .index-value {{
     font-size:4em;
     font-weight:bold;
-    color:{max_tier_color};
-    text-shadow:0 0 30px {max_tier_color};
+    color:#fff;
+    transition: color 0.5s ease, text-shadow 0.5s ease;
   }}
   .index-status {{
     font-size:1.5em;
-    color:{max_tier_color};
+    color:#fff;
+    transition: color 0.5s ease;
     margin-top:10px;
   }}
   .index-emoji {{
@@ -8988,6 +9008,13 @@ class RealEstateMonitorApp:
     align-items:center;
     margin:12px 0;
     gap:15px;
+    cursor:pointer;
+    padding:8px;
+    border-radius:10px;
+    transition:background 0.2s ease;
+  }}
+  .tier-row:hover {{
+    background:rgba(255,255,255,0.1);
   }}
   .tier-label {{
     width:60px;
@@ -9029,6 +9056,34 @@ class RealEstateMonitorApp:
     font-size:11px;
   }}
 
+  /* 기간 선택 버튼 */
+  .period-filter {{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin-bottom:25px;
+  }}
+  .period-btn {{
+    padding:10px 24px;
+    border:2px solid rgba(255,255,255,0.3);
+    border-radius:25px;
+    background:transparent;
+    color:#fff;
+    font-size:14px;
+    font-weight:600;
+    cursor:pointer;
+    transition:all 0.3s ease;
+  }}
+  .period-btn:hover {{
+    background:rgba(255,255,255,0.1);
+    border-color:rgba(255,255,255,0.5);
+  }}
+  .period-btn.active {{
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    border-color:transparent;
+    box-shadow:0 4px 15px rgba(102,126,234,0.4);
+  }}
+
   /* 설명 */
   .description {{
     margin-top:30px;
@@ -9058,6 +9113,96 @@ class RealEstateMonitorApp:
     padding:28px 0 36px
   }}
   footer.page a{{color:#cfe6ff; text-decoration:none}}
+
+  /* 티어 상세 모달 */
+  .tier-modal-overlay {{
+    display:none;
+    position:fixed;
+    top:0; left:0; right:0; bottom:0;
+    background:rgba(0,0,0,0.8);
+    z-index:1000;
+    align-items:center;
+    justify-content:center;
+  }}
+  .tier-modal-overlay.show {{
+    display:flex;
+  }}
+  .tier-modal {{
+    background:#1a1d2e;
+    border-radius:20px;
+    width:90%;
+    max-width:600px;
+    max-height:80vh;
+    overflow:hidden;
+    box-shadow:0 25px 50px rgba(0,0,0,0.5);
+    border:1px solid rgba(255,255,255,0.1);
+  }}
+  .tier-modal-header {{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:20px;
+    border-bottom:1px solid rgba(255,255,255,0.1);
+  }}
+  .tier-modal-header h3 {{
+    margin:0;
+    font-size:18px;
+  }}
+  .tier-modal-close {{
+    background:none;
+    border:none;
+    font-size:24px;
+    color:#fff;
+    cursor:pointer;
+    padding:5px 10px;
+    border-radius:5px;
+    transition:background 0.2s;
+  }}
+  .tier-modal-close:hover {{
+    background:rgba(255,255,255,0.1);
+  }}
+  .tier-modal-body {{
+    max-height:60vh;
+    overflow-y:auto;
+    padding:20px;
+  }}
+  .apt-item {{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:12px 15px;
+    margin:8px 0;
+    background:rgba(255,255,255,0.05);
+    border-radius:10px;
+    border-left:4px solid;
+  }}
+  .apt-item-info {{
+    flex:1;
+  }}
+  .apt-item-name {{
+    font-weight:bold;
+    font-size:14px;
+    margin-bottom:4px;
+  }}
+  .apt-item-location {{
+    font-size:12px;
+    color:rgba(255,255,255,0.6);
+  }}
+  .apt-item-price {{
+    font-weight:bold;
+    font-size:15px;
+    color:#4CAF50;
+  }}
+  .apt-item-date {{
+    font-size:11px;
+    color:rgba(255,255,255,0.5);
+    margin-left:10px;
+  }}
+  .no-data-msg {{
+    text-align:center;
+    color:rgba(255,255,255,0.5);
+    padding:40px;
+  }}
 
   @media (max-width:640px){{
     .block-grid{{
@@ -9113,9 +9258,25 @@ class RealEstateMonitorApp:
   <div class="status-section">
     <div class="status-header">
       <h2>📊 부동산 최신 근황</h2>
-      <p class="status-subtitle">{escape(list_name)} | 최근 4주 거래 현황</p>
+      <p class="status-subtitle" id="periodSubtitle">{escape(list_name)} | 최근 4주 거래 현황</p>
     </div>
     <div class="created-date">📅 제작일: {escape(now)}</div>
+
+    <!-- 이번주 핫플레이스 -->
+    {f'''<div class="hotplace-section">
+      <div class="hotplace-card">
+        <div class="hotplace-label">🏆 이번주 핫플레이스 (KB 주간 상승률 TOP)</div>
+        <div class="hotplace-region">{escape(hotplace_region)}</div>
+        <div class="hotplace-rate">+{escape(hotplace_rate)}%</div>
+      </div>
+    </div>''' if hotplace_region else ''}
+
+    <!-- 기간 선택 버튼 -->
+    <div class="period-filter">
+      <button class="period-btn" data-weeks="1" onclick="changePeriod(1)">1주</button>
+      <button class="period-btn" data-weeks="2" onclick="changePeriod(2)">2주</button>
+      <button class="period-btn active" data-weeks="4" onclick="changePeriod(4)">4주</button>
+    </div>
 
     <!-- 나침반 게이지 + 티어별 지역 -->
     <div class="gauge-section">
@@ -9123,7 +9284,7 @@ class RealEstateMonitorApp:
         <div class="gauge">
           <div class="gauge-bg"></div>
           <div class="gauge-inner"></div>
-          <div class="gauge-needle"></div>
+          <div class="gauge-needle" id="gaugeNeedle"></div>
           <div class="gauge-center"></div>
         </div>
         <div class="gauge-labels">
@@ -9137,9 +9298,9 @@ class RealEstateMonitorApp:
         </div>
         <!-- 지수 표시 -->
         <div class="index-display">
-          <div class="index-emoji">{status_emoji}</div>
-          <div class="index-value">{max_new_high}건</div>
-          <div class="index-status">{status}</div>
+          <div class="index-emoji" id="indexEmoji">⏳</div>
+          <div class="index-value" id="indexValue">-</div>
+          <div class="index-status" id="indexStatus">로딩 중...</div>
         </div>
       </div>
 
@@ -9152,25 +9313,23 @@ class RealEstateMonitorApp:
 
     <!-- 티어별 차트 -->
     <div class="tier-chart">
-      <h2>📊 티어별 신고가 현황 (최근 4주)</h2>
-      {tier_bars_html}
+      <h2 id="tierChartTitle">📊 티어별 신고가 현황 (최근 4주)</h2>
+      <div id="tierBarsContainer"></div>
     </div>
 
     <!-- TOP 3 거래 지역 -->
     <div class="top3-section">
-      <h2>🏆 최근 4주 거래량 TOP 3 지역</h2>
-      <div class="top3-list">
-        {top3_html}
-      </div>
+      <h2 id="top3Title">🏆 최근 4주 거래량 TOP 3 지역</h2>
+      <div class="top3-list" id="top3Container"></div>
     </div>
 
     <!-- 설명 -->
     <div class="description">
       <h3>📖 지수 해석 방법</h3>
       <p>
-        • 나침반은 <strong>최근 4주 신고가가 가장 많은 티어</strong>를 가리킵니다.<br>
+        • 나침반은 <strong>선택한 기간 내 신고가가 가장 많은 티어</strong>를 가리킵니다.<br>
         • 숫자는 해당 티어의 신고가 거래 건수입니다.<br>
-        • TOP 3 지역구는 최근 4주간 전체 거래가 가장 많았던 지역입니다.
+        • TOP 3 지역구는 선택한 기간 내 전체 거래가 가장 많았던 지역입니다.
       </p>
     </div>
   </div><!-- status-section 끝 -->
@@ -9179,6 +9338,317 @@ class RealEstateMonitorApp:
     <div><strong>협업 및 수정 문의</strong> · <a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">https://litt.ly/richdadtechtree</a></div>
   </footer>
 </main>
+
+<script>
+// 거래 데이터: [date, region_key, sido_type, is_new_high, tier]
+// sido_type: 0=서울, 1=경기, 2=인천
+const allTrades = {trades_json};
+const tierInfo = {tier_info_json};
+const listName = "{escape(list_name)}";
+
+let currentWeeks = 4;
+let isSpinning = false;
+
+function changePeriod(weeks) {{
+  if (isSpinning) return; // 스핀 중에는 클릭 무시
+
+  currentWeeks = weeks;
+
+  // 버튼 활성화 상태 업데이트
+  document.querySelectorAll('.period-btn').forEach(btn => {{
+    btn.classList.toggle('active', parseInt(btn.dataset.weeks) === weeks);
+  }});
+
+  startSpinAnimation();
+}}
+
+function startSpinAnimation() {{
+  isSpinning = true;
+  const needle = document.getElementById('gaugeNeedle');
+
+  // 데이터 숨기기 (로딩 상태)
+  document.getElementById('indexEmoji').textContent = '⏳';
+  document.getElementById('indexValue').textContent = '...';
+  document.getElementById('indexValue').style.color = '#fff';
+  document.getElementById('indexValue').style.textShadow = 'none';
+  document.getElementById('indexStatus').textContent = '분석 중';
+  document.getElementById('indexStatus').style.color = '#fff';
+
+  // 스핀 애니메이션 시작
+  needle.classList.remove('stopping');
+  needle.classList.add('spinning');
+
+  // 1.5~2.5초 후 멈춤
+  const spinDuration = 1500 + Math.random() * 1000;
+
+  setTimeout(() => {{
+    stopSpinAnimation();
+  }}, spinDuration);
+}}
+
+function stopSpinAnimation() {{
+  const needle = document.getElementById('gaugeNeedle');
+
+  // 스핀 애니메이션 중지
+  needle.classList.remove('spinning');
+  needle.classList.add('stopping');
+
+  // 데이터 계산
+  const result = calculateData();
+
+  // 최종 각도로 이동
+  const needleAngle = -90 + (result.maxTier - 1) * (180 / 6);
+  needle.style.transform = `translateX(-50%) rotate(${{needleAngle}}deg)`;
+
+  // 바늘이 멈춘 후 데이터 표시 (1.5초 후)
+  setTimeout(() => {{
+    revealData(result);
+    isSpinning = false;
+  }}, 1500);
+}}
+
+function calculateData() {{
+  const today = new Date();
+  const cutoffDate = new Date(today);
+  cutoffDate.setDate(cutoffDate.getDate() - (currentWeeks * 7));
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+  // 기간 내 거래 필터링
+  const filteredTrades = allTrades.filter(t => t[0] >= cutoffStr);
+
+  // 티어별 신고가 및 거래 집계
+  const tierStats = {{}};
+  for (let t = 1; t <= 7; t++) {{
+    tierStats[t] = {{ newHighs: 0, trades: 0 }};
+  }}
+
+  // 지역별 거래량 집계 (서울/경기/인천)
+  const seoulTrades = {{}};
+  const gyeonggiTrades = {{}};
+  const incheonTrades = {{}};
+
+  filteredTrades.forEach(trade => {{
+    const [date, regionKey, sidoType, isNewHigh, tier] = trade;
+
+    if (tierStats[tier]) {{
+      tierStats[tier].trades++;
+      if (isNewHigh) tierStats[tier].newHighs++;
+    }}
+
+    if (sidoType === 0) {{
+      seoulTrades[regionKey] = (seoulTrades[regionKey] || 0) + 1;
+    }} else if (sidoType === 1) {{
+      gyeonggiTrades[regionKey] = (gyeonggiTrades[regionKey] || 0) + 1;
+    }} else {{
+      incheonTrades[regionKey] = (incheonTrades[regionKey] || 0) + 1;
+    }}
+  }});
+
+  // 가장 신고가가 많은 티어 찾기
+  let maxNewHigh = 0;
+  let maxTier = 1;
+  for (let t = 1; t <= 7; t++) {{
+    if (tierStats[t].newHighs > maxNewHigh) {{
+      maxNewHigh = tierStats[t].newHighs;
+      maxTier = t;
+    }}
+  }}
+
+  return {{
+    tierStats,
+    seoulTrades,
+    gyeonggiTrades,
+    incheonTrades,
+    maxNewHigh,
+    maxTier
+  }};
+}}
+
+function revealData(result) {{
+  const {{ tierStats, seoulTrades, gyeonggiTrades, incheonTrades, maxNewHigh, maxTier }} = result;
+
+  // 상태 결정
+  const tierName = tierInfo[maxTier].name;
+  const tierColor = tierInfo[maxTier].color;
+  let status, emoji;
+  if (maxNewHigh >= 20) {{
+    status = `${{tierName}} 신고가 폭발`;
+    emoji = '🔥';
+  }} else if (maxNewHigh >= 10) {{
+    status = `${{tierName}} 신고가 다수`;
+    emoji = '📈';
+  }} else if (maxNewHigh >= 5) {{
+    status = `${{tierName}} 신고가 보통`;
+    emoji = '⚖️';
+  }} else if (maxNewHigh >= 1) {{
+    status = `${{tierName}} 신고가 소수`;
+    emoji = '📉';
+  }} else {{
+    status = '신고가 없음';
+    emoji = '😴';
+  }}
+
+  // 지수 표시 업데이트 (애니메이션 효과)
+  document.getElementById('indexEmoji').textContent = emoji;
+  document.getElementById('indexValue').textContent = `${{maxNewHigh}}건`;
+  document.getElementById('indexValue').style.color = tierColor;
+  document.getElementById('indexValue').style.textShadow = `0 0 30px ${{tierColor}}`;
+  document.getElementById('indexStatus').textContent = status;
+  document.getElementById('indexStatus').style.color = tierColor;
+
+  // 제목 업데이트
+  document.getElementById('periodSubtitle').textContent =
+    `${{listName}} | 최근 ${{currentWeeks}}주 거래 현황`;
+  document.getElementById('tierChartTitle').textContent =
+    `📊 티어별 신고가 현황 (최근 ${{currentWeeks}}주)`;
+  document.getElementById('top3Title').textContent =
+    `🏆 최근 ${{currentWeeks}}주 거래량 TOP 3 지역`;
+
+  // 티어별 바 차트 업데이트
+  const allNewHighs = Object.values(tierStats).map(s => s.newHighs);
+  const maxBarValue = Math.max(...allNewHighs, 1);
+
+  let tierBarsHtml = '';
+  for (let t = 1; t <= 7; t++) {{
+    const stats = tierStats[t];
+    const info = tierInfo[t];
+    let barWidth = stats.newHighs > 0 ? Math.max(5, (stats.newHighs / maxBarValue) * 100) : 5;
+
+    let changeIcon;
+    if (stats.newHighs >= 10) changeIcon = '🔥';
+    else if (stats.newHighs >= 5) changeIcon = '📈';
+    else if (stats.newHighs >= 1) changeIcon = '✨';
+    else changeIcon = '➖';
+
+    tierBarsHtml += `
+      <div class="tier-row" onclick="showTierDetail(${{t}}, '${{info.name}}', '${{info.color}}')" title="클릭하여 신고가 단지 상세보기">
+        <div class="tier-label" style="background:${{info.color}};">${{info.name}}</div>
+        <div class="tier-bar-container">
+          <div class="tier-bar" style="width:${{barWidth}}%; background:${{info.color}};"></div>
+        </div>
+        <div class="tier-stats">
+          <span class="change-icon">${{changeIcon}}</span>
+          <span class="change-text">신고가 ${{stats.newHighs}}건</span>
+          <span class="trade-count">(총 ${{stats.trades}}건)</span>
+        </div>
+      </div>
+    `;
+  }}
+  document.getElementById('tierBarsContainer').innerHTML = tierBarsHtml;
+
+  // TOP 3 지역 업데이트
+  function getTop3(tradeObj) {{
+    return Object.entries(tradeObj)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }}
+
+  function makeTop3Line(regionName, top3List) {{
+    if (!top3List.length) {{
+      return `<span class="top3-region">${{regionName}}</span><span class="top3-items">데이터 없음</span>`;
+    }}
+    const medals = ['🥇', '🥈', '🥉'];
+    const items = top3List.map((item, i) =>
+      `${{medals[i] || ''}}${{item[0]}}(${{item[1]}}건)`
+    ).join(' | ');
+    return `<span class="top3-region">${{regionName}}</span><span class="top3-items">${{items}}</span>`;
+  }}
+
+  const top3Seoul = getTop3(seoulTrades);
+  const top3Gyeonggi = getTop3(gyeonggiTrades);
+  const top3Incheon = getTop3(incheonTrades);
+
+  document.getElementById('top3Container').innerHTML = `
+    <div class="top3-row">${{makeTop3Line('서울', top3Seoul)}}</div>
+    <div class="top3-row">${{makeTop3Line('경기', top3Gyeonggi)}}</div>
+    <div class="top3-row">${{makeTop3Line('인천', top3Incheon)}}</div>
+  `;
+}}
+
+// 페이지 로드 시 룰렛 애니메이션으로 시작
+document.addEventListener('DOMContentLoaded', () => {{
+  startSpinAnimation();
+}});
+
+// 티어 상세 모달 표시
+function showTierDetail(tier, tierName, tierColor) {{
+  const modal = document.getElementById('tierModal');
+  const modalTitle = document.getElementById('tierModalTitle');
+  const modalBody = document.getElementById('tierModalBody');
+
+  modalTitle.innerHTML = `<span style="display:inline-block;padding:4px 12px;background:${{tierColor}};border-radius:6px;margin-right:10px;">${{tierName}}</span> 신고가 단지 목록`;
+
+  // 현재 기간 설정에 맞는 거래 필터링
+  const today = new Date();
+  const cutoffDate = new Date(today);
+  cutoffDate.setDate(cutoffDate.getDate() - (currentWeeks * 7));
+  const cutoffStr = cutoffDate.toISOString().split('T')[0];
+
+  // allTrades 배열에서 해당 티어의 신고가 거래만 필터링
+  // trades 구조: [date, region_key, sido_type, is_new_high, tier, apt_name, sigungu, price, dong]
+  const tierNewHighs = allTrades.filter(t => {{
+    const tradeDate = t[0];
+    const isNewHigh = t[3];
+    const tradeTier = t[4];
+    return tradeDate >= cutoffStr && isNewHigh === 1 && tradeTier === tier;
+  }});
+
+  if (tierNewHighs.length === 0) {{
+    modalBody.innerHTML = '<div class="no-data-msg">해당 티어에 신고가 거래가 없습니다.</div>';
+  }} else {{
+    // 가격 순으로 정렬 (높은 순)
+    tierNewHighs.sort((a, b) => b[7] - a[7]);
+
+    let html = '';
+    tierNewHighs.forEach(t => {{
+      const date = t[0];
+      const aptName = t[5] || '단지명 없음';
+      const sigungu = t[6] || '';
+      const price = t[7] || 0;
+      const dong = t[8] || '';
+      // 시/구/동 전체 주소 조합
+      const fullAddress = dong ? `${{sigungu}} ${{dong}}` : sigungu || '지역 없음';
+      const priceStr = price >= 10000
+        ? `${{Math.floor(price/10000)}}억 ${{price % 10000 > 0 ? (price % 10000) + '만' : ''}}`
+        : `${{price}}만`;
+
+      html += `
+        <div class="apt-item" style="border-left-color:${{tierColor}};">
+          <div class="apt-item-info">
+            <div class="apt-item-name">${{aptName}}</div>
+            <div class="apt-item-location">${{fullAddress}}</div>
+          </div>
+          <div>
+            <span class="apt-item-price">${{priceStr}}</span>
+            <span class="apt-item-date">${{date}}</span>
+          </div>
+        </div>
+      `;
+    }});
+    modalBody.innerHTML = html;
+  }}
+
+  modal.classList.add('show');
+}}
+
+// 모달 닫기
+function closeTierModal() {{
+  document.getElementById('tierModal').classList.remove('show');
+}}
+</script>
+
+<!-- 티어 상세 모달 -->
+<div id="tierModal" class="tier-modal-overlay" onclick="if(event.target===this)closeTierModal();">
+  <div class="tier-modal">
+    <div class="tier-modal-header">
+      <h3 id="tierModalTitle">티어 상세</h3>
+      <button class="tier-modal-close" onclick="closeTierModal()">✕</button>
+    </div>
+    <div class="tier-modal-body" id="tierModalBody">
+    </div>
+  </div>
+</div>
+
 </body>
 </html>"""
 
@@ -9187,7 +9657,57 @@ class RealEstateMonitorApp:
     def export_fear_greed_html(self):
         """부동산 최신 근황 HTML 내보내기 (newtrade/index.html)"""
         try:
-            html_str = self.build_fear_greed_html()
+            # 이번주 핫플레이스 입력 다이얼로그
+            hotplace_dialog = tk.Toplevel(self.root)
+            hotplace_dialog.title("이번주 핫플레이스 입력")
+            hotplace_dialog.geometry("350x180")
+            hotplace_dialog.resizable(False, False)
+            hotplace_dialog.transient(self.root)
+            hotplace_dialog.grab_set()
+
+            # 중앙 정렬
+            hotplace_dialog.update_idletasks()
+            x = (hotplace_dialog.winfo_screenwidth() - 350) // 2
+            y = (hotplace_dialog.winfo_screenheight() - 180) // 2
+            hotplace_dialog.geometry(f"+{x}+{y}")
+
+            ttk.Label(hotplace_dialog, text="📍 이번주 핫플레이스 (KB 주간 상승률 TOP)", font=('', 10, 'bold')).pack(pady=(15, 10))
+
+            frame = ttk.Frame(hotplace_dialog)
+            frame.pack(pady=5, padx=20, fill='x')
+
+            ttk.Label(frame, text="지역명:").grid(row=0, column=0, sticky='e', padx=5, pady=5)
+            region_var = tk.StringVar()
+            region_entry = ttk.Entry(frame, textvariable=region_var, width=20)
+            region_entry.grid(row=0, column=1, sticky='w', padx=5, pady=5)
+
+            ttk.Label(frame, text="상승률(%):").grid(row=1, column=0, sticky='e', padx=5, pady=5)
+            rate_var = tk.StringVar()
+            rate_entry = ttk.Entry(frame, textvariable=rate_var, width=20)
+            rate_entry.grid(row=1, column=1, sticky='w', padx=5, pady=5)
+
+            hotplace_result = {'region': '', 'rate': ''}
+
+            def on_confirm():
+                hotplace_result['region'] = region_var.get().strip()
+                hotplace_result['rate'] = rate_var.get().strip()
+                hotplace_dialog.destroy()
+
+            def on_skip():
+                hotplace_dialog.destroy()
+
+            btn_frame = ttk.Frame(hotplace_dialog)
+            btn_frame.pack(pady=15)
+            ttk.Button(btn_frame, text="확인", command=on_confirm, width=10).pack(side='left', padx=5)
+            ttk.Button(btn_frame, text="건너뛰기", command=on_skip, width=10).pack(side='left', padx=5)
+
+            region_entry.focus_set()
+            hotplace_dialog.wait_window()
+
+            html_str = self.build_fear_greed_html(
+                hotplace_region=hotplace_result['region'],
+                hotplace_rate=hotplace_result['rate']
+            )
             if not html_str:
                 messagebox.showwarning("알림", "거래 데이터가 없습니다.\n먼저 '데이터 갱신'을 실행해주세요.")
                 return None

@@ -319,7 +319,11 @@ class RealEstateMonitorApp:
 
         # 마지막 검색 지역 저장 변수
         self.last_search_region = ""
-        
+
+        # 마지막 핫플레이스 정보 저장 변수
+        self.last_hotplace_region = ""
+        self.last_hotplace_rate = ""
+
         # 법정동 파일 로드
         self.load_lawdong_file()
     
@@ -823,6 +827,32 @@ class RealEstateMonitorApp:
         except Exception as e:
             logging.error(f"마지막 활성 리스트 저장 중 오류: {str(e)}")
 
+    def save_hotplace_settings(self):
+        """마지막 핫플레이스 정보 저장"""
+        try:
+            settings_file = os.path.join(os.getcwd(), 'monitor_settings.json')
+            settings_data = {}
+
+            # 기존 설정 로드
+            if os.path.exists(settings_file):
+                try:
+                    with open(settings_file, 'r', encoding='utf-8') as f:
+                        settings_data = json.load(f)
+                except:
+                    pass
+
+            # 핫플레이스 정보 업데이트
+            settings_data['hotplace_region'] = self.last_hotplace_region
+            settings_data['hotplace_rate'] = self.last_hotplace_rate
+
+            # 저장
+            with open(settings_file, 'w', encoding='utf-8') as f:
+                json.dump(settings_data, f, ensure_ascii=False, indent=2)
+
+            logging.info(f"핫플레이스 정보 저장: {self.last_hotplace_region} +{self.last_hotplace_rate}%")
+        except Exception as e:
+            logging.error(f"핫플레이스 정보 저장 중 오류: {str(e)}")
+
     def load_settings(self):
         """설정 파일 불러오기"""
         try:
@@ -855,6 +885,11 @@ class RealEstateMonitorApp:
                         if 'last_search_region' in settings_data:
                             self.last_search_region = settings_data['last_search_region']
                             logging.info(f"설정에서 마지막 검색 지역 로드: {self.last_search_region}")
+                        # 마지막 핫플레이스 정보 로드
+                        if 'hotplace_region' in settings_data:
+                            self.last_hotplace_region = settings_data['hotplace_region']
+                        if 'hotplace_rate' in settings_data:
+                            self.last_hotplace_rate = settings_data['hotplace_rate']
                 except Exception as e:
                     logging.error(f"설정 파일 불러오기 중 오류: {str(e)}")
         except Exception as e:
@@ -8581,28 +8616,65 @@ class RealEstateMonitorApp:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         list_name = self.active_list.get() if hasattr(self, 'active_list') else "모니터링 리스트"
 
-        # 티어별 지역 목록 HTML 생성 (정적)
+        # 토지거래허가구역 목록 (2025.10.20 시행)
+        LAND_PERMIT_ZONES = [
+            # 서울 25개구 전역
+            '서울 강남구', '서울 강동구', '서울 강북구', '서울 강서구', '서울 관악구',
+            '서울 광진구', '서울 구로구', '서울 금천구', '서울 노원구', '서울 도봉구',
+            '서울 동대문구', '서울 동작구', '서울 마포구', '서울 서대문구', '서울 서초구',
+            '서울 성동구', '서울 성북구', '서울 송파구', '서울 양천구', '서울 영등포구',
+            '서울 용산구', '서울 은평구', '서울 종로구', '서울 중구', '서울 중랑구',
+            # 경기도 12개 시·구
+            '성남시 분당구', '성남시 수정구', '성남시 중원구',
+            '수원시 영통구', '수원시 장안구', '수원시 팔달구',
+            '용인시 수지구', '안양시 동안구',
+            '과천시', '광명시', '의왕시', '하남시'
+        ]
+
+        # 티어별 지역 목록 HTML 생성 (토허구역 노란색 표시)
         tier_regions_html = ""
         for tier in range(1, 8):
             tier_info = self.REGION_TIERS[tier]
-            regions = ", ".join(tier_info['regions'])
+            # 각 지역을 토허구역 여부에 따라 스타일 적용
+            styled_regions = []
+            for region in tier_info['regions']:
+                if region in LAND_PERMIT_ZONES:
+                    styled_regions.append(f'<span class="land-permit-zone">{escape(region)}</span>')
+                else:
+                    styled_regions.append(escape(region))
+            regions_html = ", ".join(styled_regions)
             tier_regions_html += f"""
             <div class="tier-region-item">
               <div class="tier-color-dot" style="background:{tier_info['color']};"></div>
               <div class="tier-region-list">
-                <span class="tier-region-name">{tier_info['name']}:</span>{escape(regions)}
+                <span class="tier-region-name">{tier_info['name']}:</span>{regions_html}
               </div>
             </div>
             """
+        # 토허구역 범례 추가
+        tier_regions_html += """
+        <div class="land-permit-legend">
+          <span class="land-permit-zone">노란색</span> = 토지거래허가구역 (2025.10.20~)
+        </div>
+        """
 
         # JavaScript용 거래 데이터 JSON 생성 (all_trades에서 추출)
+        # 최근 4주 데이터만 포함 (최대 조회 기간이 4주이므로)
         # 각 거래: [date, region_key, sido_type, is_new_high, tier, apt_name, sigungu, price, dong]
         # sido_type: 0=서울, 1=경기, 2=인천
+        # 신고가가 아닌 거래는 상세 정보(apt_name, sigungu, price, dong) 생략하여 용량 감소
         import json
-        trades_for_js = [
-            [t['date'], t['region_key'], t['sido_type'], 1 if t['is_new_high'] else 0, t['tier'], t.get('apt_name', ''), t.get('sigungu', ''), t.get('price', 0), t.get('dong', '')]
-            for t in all_trades
-        ]
+        four_weeks_cutoff = (datetime.now() - timedelta(days=28)).strftime('%Y-%m-%d')
+        trades_for_js = []
+        for t in all_trades:
+            if t['date'] < four_weeks_cutoff:
+                continue
+            if t['is_new_high']:
+                # 신고가: 상세 정보 포함
+                trades_for_js.append([t['date'], t['region_key'], t['sido_type'], 1, t['tier'], t.get('apt_name', ''), t.get('sigungu', ''), t.get('price', 0), t.get('dong', '')])
+            else:
+                # 일반 거래: 상세 정보 생략
+                trades_for_js.append([t['date'], t['region_key'], t['sido_type'], 0, t['tier']])
         trades_json = json.dumps(trades_for_js, ensure_ascii=False)
 
         # 티어 정보 JSON
@@ -8849,6 +8921,23 @@ class RealEstateMonitorApp:
     color:#fff;
     margin-right:5px;
   }}
+  .land-permit-zone {{
+    color:#FFD700;
+    font-weight:600;
+  }}
+  .land-permit-legend {{
+    margin-top:15px;
+    padding-top:12px;
+    border-top:1px solid rgba(255,255,255,0.1);
+    font-size:11px;
+    color:rgba(255,255,255,0.6);
+    text-align:center;
+  }}
+  .land-permit-legend .land-permit-zone {{
+    background:rgba(255,215,0,0.2);
+    padding:2px 6px;
+    border-radius:3px;
+  }}
   .gauge {{
     position:relative;
     width:300px;
@@ -8894,18 +8983,8 @@ class RealEstateMonitorApp:
     border-radius:2px;
     box-shadow:0 0 10px rgba(255,255,255,0.5);
   }}
-  .gauge-needle.spinning {{
-    animation: needleSpin 0.15s linear infinite;
-  }}
-  .gauge-needle.stopping {{
-    transition: transform 1.5s cubic-bezier(0.17, 0.67, 0.12, 0.99);
-  }}
-  @keyframes needleSpin {{
-    0% {{ transform: translateX(-50%) rotate(-90deg); }}
-    25% {{ transform: translateX(-50%) rotate(0deg); }}
-    50% {{ transform: translateX(-50%) rotate(90deg); }}
-    75% {{ transform: translateX(-50%) rotate(0deg); }}
-    100% {{ transform: translateX(-50%) rotate(-90deg); }}
+  .gauge-needle {{
+    transition: transform 0.8s ease-out;
   }}
   .gauge-center {{
     position:absolute;
@@ -9219,7 +9298,7 @@ class RealEstateMonitorApp:
 </head>
 <body>
 <!-- 워터마크 -->
-<div class="watermark"><div class="watermark-text">{"".join(['<span>부태리 ⓒ 2025</span>' for _ in range(100)])}</div></div>
+<div class="watermark"><div class="watermark-text">{"".join(['<span>부태리 ⓒ 2025</span>' for _ in range(30)])}</div></div>
 
 <header class="main-header">
   <div class="wrap">
@@ -9347,11 +9426,8 @@ const tierInfo = {tier_info_json};
 const listName = "{escape(list_name)}";
 
 let currentWeeks = 4;
-let isSpinning = false;
 
 function changePeriod(weeks) {{
-  if (isSpinning) return; // 스핀 중에는 클릭 무시
-
   currentWeeks = weeks;
 
   // 버튼 활성화 상태 업데이트
@@ -9359,52 +9435,19 @@ function changePeriod(weeks) {{
     btn.classList.toggle('active', parseInt(btn.dataset.weeks) === weeks);
   }});
 
-  startSpinAnimation();
+  updateDisplay();
 }}
 
-function startSpinAnimation() {{
-  isSpinning = true;
-  const needle = document.getElementById('gaugeNeedle');
-
-  // 데이터 숨기기 (로딩 상태)
-  document.getElementById('indexEmoji').textContent = '⏳';
-  document.getElementById('indexValue').textContent = '...';
-  document.getElementById('indexValue').style.color = '#fff';
-  document.getElementById('indexValue').style.textShadow = 'none';
-  document.getElementById('indexStatus').textContent = '분석 중';
-  document.getElementById('indexStatus').style.color = '#fff';
-
-  // 스핀 애니메이션 시작
-  needle.classList.remove('stopping');
-  needle.classList.add('spinning');
-
-  // 1.5~2.5초 후 멈춤
-  const spinDuration = 1500 + Math.random() * 1000;
-
-  setTimeout(() => {{
-    stopSpinAnimation();
-  }}, spinDuration);
-}}
-
-function stopSpinAnimation() {{
-  const needle = document.getElementById('gaugeNeedle');
-
-  // 스핀 애니메이션 중지
-  needle.classList.remove('spinning');
-  needle.classList.add('stopping');
-
-  // 데이터 계산
+function updateDisplay() {{
   const result = calculateData();
+  const needle = document.getElementById('gaugeNeedle');
 
-  // 최종 각도로 이동
+  // 바늘 각도 설정
   const needleAngle = -90 + (result.maxTier - 1) * (180 / 6);
   needle.style.transform = `translateX(-50%) rotate(${{needleAngle}}deg)`;
 
-  // 바늘이 멈춘 후 데이터 표시 (1.5초 후)
-  setTimeout(() => {{
-    revealData(result);
-    isSpinning = false;
-  }}, 1500);
+  // 데이터 표시
+  revealData(result);
 }}
 
 function calculateData() {{
@@ -9565,9 +9608,9 @@ function revealData(result) {{
   `;
 }}
 
-// 페이지 로드 시 룰렛 애니메이션으로 시작
+// 페이지 로드 시 데이터 표시
 document.addEventListener('DOMContentLoaded', () => {{
-  startSpinAnimation();
+  updateDisplay();
 }});
 
 // 티어 상세 모달 표시
@@ -9585,7 +9628,8 @@ function showTierDetail(tier, tierName, tierColor) {{
   const cutoffStr = cutoffDate.toISOString().split('T')[0];
 
   // allTrades 배열에서 해당 티어의 신고가 거래만 필터링
-  // trades 구조: [date, region_key, sido_type, is_new_high, tier, apt_name, sigungu, price, dong]
+  // 신고가: [date, region_key, sido_type, 1, tier, apt_name, sigungu, price, dong]
+  // 일반거래: [date, region_key, sido_type, 0, tier]
   const tierNewHighs = allTrades.filter(t => {{
     const tradeDate = t[0];
     const isNewHigh = t[3];
@@ -9677,12 +9721,12 @@ function closeTierModal() {{
             frame.pack(pady=5, padx=20, fill='x')
 
             ttk.Label(frame, text="지역명:").grid(row=0, column=0, sticky='e', padx=5, pady=5)
-            region_var = tk.StringVar()
+            region_var = tk.StringVar(value=self.last_hotplace_region)  # 마지막 값 불러오기
             region_entry = ttk.Entry(frame, textvariable=region_var, width=20)
             region_entry.grid(row=0, column=1, sticky='w', padx=5, pady=5)
 
             ttk.Label(frame, text="상승률(%):").grid(row=1, column=0, sticky='e', padx=5, pady=5)
-            rate_var = tk.StringVar()
+            rate_var = tk.StringVar(value=self.last_hotplace_rate)  # 마지막 값 불러오기
             rate_entry = ttk.Entry(frame, textvariable=rate_var, width=20)
             rate_entry.grid(row=1, column=1, sticky='w', padx=5, pady=5)
 
@@ -9691,6 +9735,10 @@ function closeTierModal() {{
             def on_confirm():
                 hotplace_result['region'] = region_var.get().strip()
                 hotplace_result['rate'] = rate_var.get().strip()
+                # 마지막 값 저장
+                self.last_hotplace_region = hotplace_result['region']
+                self.last_hotplace_rate = hotplace_result['rate']
+                self.save_hotplace_settings()
                 hotplace_dialog.destroy()
 
             def on_skip():

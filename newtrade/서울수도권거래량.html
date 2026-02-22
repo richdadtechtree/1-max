@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>서울&수도권 거래량</title>
+<style>
+  :root {
+    --bg:#F2F2F7; --fg:#111; --sub:#6b7280; --card:#fff; --bd:#e5e7eb;
+    --primary:#007AFF; --primary-dark:#0051D2; --accent:#ff3b30;
+  }
+  *{ box-sizing:border-box }
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    color:var(--fg); background:var(--bg);
+  }
+  .page{ max-width:960px; width:92vw; margin:24px auto 80px }
+  .header{
+    background:linear-gradient(135deg,var(--primary),#63A4FF);
+    color:#fff; border-radius:16px; padding:20px 20px 16px;
+    box-shadow:0 6px 18px rgba(0,0,0,.08);
+    text-align:center;
+  }
+  .header h1{ margin:0 0 8px; font-size:26px; font-weight:800; letter-spacing:-.2px }
+  .header .sub{ margin:0; opacity:.95; font-size:14px }
+
+  .year-selector{
+    margin-top:24px;
+    display:flex; gap:16px; flex-wrap:wrap;
+    justify-content: center;
+  }
+  .year-card{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:24px 40px;
+    border:2px solid var(--bd); border-radius:16px;
+    background:var(--card); color:var(--fg); font-size:18px; font-weight:700;
+    cursor:pointer; transition:all 0.2s ease;
+    text-decoration:none;
+    min-width:200px;
+    box-shadow:0 2px 12px rgba(0,0,0,.04);
+  }
+  .year-card:hover{
+    background:linear-gradient(135deg,var(--primary),#63A4FF);
+    color:#fff;
+    border-color:var(--primary);
+    transform:translateY(-4px);
+    box-shadow:0 8px 24px rgba(0,122,255,0.25);
+  }
+  .year-card .year{
+    font-size:32px;
+    font-weight:800;
+    margin-bottom:8px;
+  }
+  .year-card .label{
+    font-size:14px;
+    font-weight:500;
+    opacity:0.8;
+  }
+
+  .year-card.y2023:hover{
+    background:linear-gradient(135deg,#22c55e,#16a34a);
+    border-color:#22c55e;
+    box-shadow:0 8px 24px rgba(34,197,94,0.25);
+  }
+  .year-card.y2024:hover{
+    background:linear-gradient(135deg,#f59e0b,#d97706);
+    border-color:#f59e0b;
+    box-shadow:0 8px 24px rgba(245,158,11,0.25);
+  }
+  .year-card.y2025:hover{
+    background:linear-gradient(135deg,#ef4444,#dc2626);
+    border-color:#ef4444;
+    box-shadow:0 8px 24px rgba(239,68,68,0.25);
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>📊 서울&수도권 거래량</h1>
+    <p class="sub">연도별 아파트 거래량 순위를 확인하세요</p>
+  </div>
+  <div class="year-selector">
+    <a href="2023거래량.html" class="year-card y2023">
+      <span class="year">2023</span>
+      <span class="label">거래량 순위</span>
+    </a>
+    <a href="2024거래량.html" class="year-card y2024">
+      <span class="year">2024</span>
+      <span class="label">거래량 순위</span>
+    </a>
+    <a href="2025거래량.html" class="year-card y2025">
+      <span class="year">2025</span>
+      <span class="label">거래량 순위</span>
+    </a>
+  </div>
+</div>
+</body>
+</html>

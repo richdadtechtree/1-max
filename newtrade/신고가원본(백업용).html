@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>신고가 - 지역별 아파트 신고가</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-75SPDY6N8V"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-75SPDY6N8V');
+  </script>
+
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#d6e0ff; --text:#e8eaf0; --muted:#96a0b5;
+      --accent:#4caf50; --accent-weak:#3a8f40; --tab:rgba(255,255,255,.06);
+      --tab-active:linear-gradient(180deg, rgba(76,175,80,.18), rgba(76,175,80,.06));
+      --ring:rgba(76,175,80,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",Arial,sans-serif;
+      background:linear-gradient(180deg,#0b0c10 0%,#0f1220 100%); color:var(--text);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(150%) blur(8px);
+      background:rgba(11,12,16,.6);
+      border-bottom:1px solid rgba(255,255,255,.06)
+    }
+    .wrap{max-width:1080px; margin:0 auto; padding:18px 16px}
+    h1{margin:0; font-size:clamp(24px, 3.5vw, 32px); letter-spacing:-.3px; font-weight:800}
+    .sub{color:var(--muted); font-size:14px; margin-top:6px}
+
+    .header-top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px}
+
+    /* 뒤로가기 버튼 */
+    .back-btn{
+      display:inline-flex; align-items:center; gap:8px; padding:10px 16px;
+      background:var(--tab); border:1px solid rgba(255,255,255,.06);
+      border-radius:10px; color:var(--text); text-decoration:none;
+      font-size:14px; font-weight:600; transition:all .2s ease;
+    }
+    .back-btn:hover{
+      background:var(--tab-active);
+      transform:translateX(-4px);
+      border-color:var(--accent-weak);
+    }
+
+    /* 블럭 카드 그리드 */
+    .block-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:20px;
+      margin-top:32px;
+      padding-bottom:48px;
+    }
+
+    .block-card{
+      background:#1a1d2e;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:32px 24px;
+      cursor:pointer;
+      transition:all .3s ease;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .block-card::before{
+      content:'';
+      position:absolute;
+      top:0; left:0; right:0; bottom:0;
+      background:linear-gradient(135deg, rgba(76,175,80,.1) 0%, rgba(76,175,80,.02) 100%);
+      opacity:0;
+      transition:opacity .3s ease;
+    }
+
+    .block-card:hover{
+      transform:translateY(-8px);
+      box-shadow:0 12px 40px rgba(76,175,80,.2);
+      border-color:rgba(76,175,80,.4);
+    }
+
+    .block-card:hover::before{
+      opacity:1;
+    }
+
+    .block-icon{
+      font-size:48px;
+      margin-bottom:16px;
+      display:block;
+    }
+
+    .block-title{
+      font-size:24px;
+      font-weight:800;
+      margin:0 0 8px 0;
+      color:var(--text);
+      position:relative;
+      z-index:1;
+    }
+
+    .block-desc{
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.6;
+      margin:0;
+      position:relative;
+      z-index:1;
+    }
+
+    footer.page{
+      border-top:1px solid rgba(255,255,255,.06);
+      text-align:center;
+      color:var(--muted);
+      font-size:13px;
+      padding:28px 0 36px
+    }
+    footer.page a{color:#cfe6ff; text-decoration:none}
+
+    @media (max-width:640px){
+      .block-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 휴무 팝업 -->
+  <script>
+    window.onload = function() {
+      window.open('신고가 휴무 팝업.html', '신고가휴무안내', 'width=480,height=400,scrollbars=no,resizable=no');
+    };
+  </script>
+  <header>
+    <div class="wrap">
+      <a href="index.html" class="back-btn">← 메인으로</a>
+      <div class="header-top" style="margin-top:12px">
+        <div>
+          <h1 style="color:#000000">신고가</h1>
+          <div class="sub">지역별 아파트 신고가 정보</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="block-grid">
+      <!-- 서울&수도권 신고가 -->
+      <div class="block-card" onclick="location.href='서울&수도권 신고가.html'">
+        <span class="block-icon">🏙️</span>
+        <h2 class="block-title">서울 & 수도권 신고가</h2>
+        <p class="block-desc">서울·경기·인천 지역 아파트 최고가 기록</p>
+      </div>
+
+      <!-- 대구 신고가 -->
+      <div class="block-card" onclick="location.href='대구신고가.html'">
+        <span class="block-icon">🌆</span>
+        <h2 class="block-title">대구 신고가</h2>
+        <p class="block-desc">대구 지역 아파트 최고가 기록</p>
+      </div>
+
+      <!-- 부산 신고가 -->
+      <div class="block-card" onclick="location.href='부산신고가.html'">
+        <span class="block-icon">🌊</span>
+        <h2 class="block-title">부산 신고가</h2>
+        <p class="block-desc">부산 지역 아파트 최고가 기록</p>
+      </div>
+
+      <!-- 서울&수도권 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='서울&수도권 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">📊</span>
+        <h2 class="block-title">서울 & 수도권 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">서울·경기·인천 지역 거래량 금액대 분포 분석</p>
+      </div>
+
+      <!-- 서울 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='서울 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">🏛️</span>
+        <h2 class="block-title">서울 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">서울 지역 거래량 금액대 분포 분석</p>
+      </div>
+
+      <!-- 경기 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='경기 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">🏘️</span>
+        <h2 class="block-title">경기 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">경기 지역 거래량 금액대 분포 분석</p>
+      </div>
+
+      <!-- 인천 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='인천 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">⚓</span>
+        <h2 class="block-title">인천 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">인천 지역 거래량 금액대 분포 분석</p>
+      </div>
+
+      <!-- 대구 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='대구 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">📈</span>
+        <h2 class="block-title">대구 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">대구 지역 거래량 금액대 분포 분석</p>
+      </div>
+
+      <!-- 부산 최근 거래량 금액대 분포 -->
+      <div class="block-card" onclick="location.href='부산 최근 거래량 금액대 분포.html'">
+        <span class="block-icon">📉</span>
+        <h2 class="block-title">부산 최근 거래량 금액대 분포</h2>
+        <p class="block-desc">부산 지역 거래량 금액대 분포 분석</p>
+      </div>
+    </div>
+
+    <footer class="page">
+      <div><strong>협업 및 수정 문의</strong> · <a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">https://litt.ly/richdadtechtree</a></div>
+    </footer>
+  </main>
+</body>
+</html>

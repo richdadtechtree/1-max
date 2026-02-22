@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>실거주 or 갭투자 투자맵</title>
+<style>
+  :root{
+    --bg:#f8fafc;
+    --card:#ffffff;
+    --border:#e5e7eb;
+    --text:#111827;
+    --sub:#6b7280;
+    --brand:#4f46e5;
+    --brand-50:#eef2ff;
+    --brand-200:#c7d2fe;
+    --ok-bg:#ecfdf5;
+    --ok-bd:#a7f3d0;
+    --warn-bg:#fff7ed;
+    --warn-bd:#fde68a;
+    --shadow:0 2px 8px rgba(0,0,0,.06);
+    --radius:12px;
+  }
+
+  /* 부드러운 스크롤 UX */
+  html{ scroll-behavior:smooth; }
+  html,body{height:100%;}
+  body{
+    overscroll-behavior-y:contain;
+    -webkit-overflow-scrolling:touch;
+
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+    color:var(--text);
+    background:var(--bg);
+    max-width: 900px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 18px;
+    box-sizing: border-box;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    line-height: 1.55;
+  }
+
+  h1{text-align:center; margin: 8px 0 18px; font-weight:800; font-size:1.4rem;}
+  label{font-weight: 700; margin-top: 10px; display:block;}
+  input[type="number"], button{
+    width: 100%;
+    padding: 14px 12px;
+    margin-bottom: 12px;
+    font-size: 1rem;
+    box-sizing: border-box;
+    border:1px solid var(--border);
+    border-radius: 10px;
+    background: #fff;
+    outline: none;
+  }
+  input[type="number"]:focus{ box-shadow: 0 0 0 3px rgba(79,70,229,.18); }
+
+  .grid{display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px; margin-top:8px}
+  .grid .wide{grid-column: span 3}
+
+  .card{
+    position: relative;
+    background:var(--card);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin: 14px 0 18px;
+    border:1px solid var(--border);
+    box-shadow: var(--shadow);
+    scroll-margin-top: 14px;
+    overflow: visible;
+  }
+
+  .hint{font-size:0.85rem; color:var(--sub); display:block; margin-top:4px;}
+  .hangul{font-size: 0.92rem; color: var(--sub); display:block; margin-top:-6px; margin-bottom:8px;}
+
+  .pill{
+    display:inline-block; padding:6px 10px; border-radius:999px;
+    background:#f1f5f9; border:1px solid #e5e7eb;
+    font-size:12px; margin:2px 6px 2px 0; white-space:nowrap;
+  }
+
+  .primary-btn{
+    background:#4f46e5; color:#fff; border: none; font-weight: 900; letter-spacing:.2px;
+    padding: 14px 16px; border-radius: 12px; cursor: pointer; margin-top: 4px;
+    box-shadow: 0 6px 18px rgba(79,70,229,.18);
+  }
+  .primary-btn:active{ transform: translateY(1px); }
+
+  table{width:100%; border-collapse:collapse; margin-top:10px; font-size:0.95rem}
+  thead th{
+    position:sticky; top:0; background:#f0f0f0; z-index:1;
+    padding:10px 8px; border-bottom:2px solid #ddd; text-align:center
+  }
+  tbody td{padding:9px 8px; border-bottom:1px solid #eee; text-align:right}
+  tbody td:first-child{font-weight:700; text-align:center}
+
+  /* LTV·전세 영역 구분선 */
+  .sep{border-right:2px solid #bbb !important}
+
+  /* 조건부 색상 */
+  .invest-ok{background:#eaf4ff}   /* 투자 가능(≥) → 연한 파란색 */
+  .invest-low{background:#fff2e0}  /* 투자 부족(<) → 연한 주황색 */
+  .ltv-restricted{background:#ffe5e5 !important; opacity:0.6}  /* 투기과열지구 LTV 제한 → 연한 빨간색 */
+
+  .footer{margin:18px 0 28px; text-align:center; font-size:0.9rem; color:#555}
+  .footer a{color:#374151; text-decoration:none; font-weight:700;}
+
+  .row{display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:6px}
+  .dsr-box{display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap}
+  .dsr-val{font-size:1.05rem; font-weight:800}
+  .note{font-size:0.85rem; color:#444; background:#f6f6ff; padding:8px 10px; border-radius:10px; margin-top:8px}
+
+  /* 모바일 최적화 */
+  @media (max-width: 640px){
+    body{ padding: 14px; }
+    .grid{ grid-template-columns: 1fr; gap:8px; }
+    input[type="number"], button{ font-size:1.02rem; padding: 16px 12px; }
+  }
+
+  /* 숨김 클래스 */
+  .hide{ display:none !important; }
+
+  /* 페이지 하단 스크롤 힌트(고정) */
+  .scroll-hint{
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    height: 56px;
+    background: linear-gradient(to top, var(--bg) 70%, rgba(248,250,252,0));
+    padding-bottom: env(safe-area-inset-bottom, 0);
+    pointer-events: none;
+    z-index: 9999;
+    display: block;
+  }
+  .scroll-hint.hide{ display:none; }
+  .scroll-hint svg{
+    position: absolute;
+    left: 50%;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0));
+    transform: translateX(-50%);
+    width: 22px; height: 22px; opacity: .55;
+    filter: drop-shadow(0 1px 1px rgba(0,0,0,.15));
+  }
+</style>
+</head>
+<body>
+  <h1>실거주 or 갭투자 투자맵</h1>
+
+  <!-- 입력 카드 -->
+  <div class="card">
+    <div class="grid">
+      <div>
+        <label>연봉 (만원)</label>
+        <input id="income" type="number" placeholder="예: 6000" inputmode="numeric" pattern="[0-9]*" oninput="updateHangulAmount('income'); renderAll()" />
+        <span id="incomeText" class="hangul"></span>
+        <div class="hint">세전 연소득 기준, 기타부채 없음 가정</div>
+      </div>
+      <div>
+        <label>대출 금리 (연 %)</label>
+        <input id="rate" type="number" step="0.01" value="4.5" oninput="renderAll()"/>
+        <div class="hint">원리금균등 상환 가정</div>
+      </div>
+      <div>
+        <label>상환 기간 (년)</label>
+        <input id="years" type="number" value="30" oninput="renderAll()"/>
+        <div class="hint">예: 30</div>
+      </div>
+
+      <div>
+        <label>가진 자산 (억)</label>
+        <input id="investEok" type="number" step="0.1" value="0" inputmode="decimal" oninput="updateAssetDisplay(); renderAll()"/>
+        <span id="investEokText" class="hangul"></span>
+        <div class="hint">자기자본(현금·보증금 등) 총액</div>
+      </div>
+      <div>
+        <label>표 최소 (억)</label>
+        <input id="minEok" type="number" value="2" oninput="renderAll()"/>
+      </div>
+      <div>
+        <label>표 최대 (억)</label>
+        <input id="maxEok" type="number" value="30" oninput="renderAll()"/>
+      </div>
+      <div>
+        <label>표 간격 (억)</label>
+        <input id="stepEok" type="number" value="1" oninput="renderAll()"/>
+      </div>
+
+      <!-- ✅ 전세가율 간격 입력 추가 -->
+      <div class="wide">
+        <label>전세가율 간격 (%)</label>
+        <input id="jeonseStepPct" type="number" min="1" max="30" step="1" value="10" oninput="renderAll()"/>
+        <div class="hint">70%부터 40%까지, 간격만 조정합니다. 예: 5 → 70, 65, 60, 55, 50, 45, 40</div>
+      </div>
+
+    </div>
+
+    <!-- ② 대출 종류 선택 -->
+    <div style="margin-top:16px; padding-top:16px; border-top:1px solid var(--border);">
+      <label style="font-weight:700; margin-bottom:8px; display:block;">② 대출 종류 선택</label>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="loanDomain" value="bank" checked onchange="switchDomain()" style="width:auto; margin:0;"/>
+          <span>금융권 대출</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="loanDomain" value="policy" onchange="switchDomain()" style="width:auto; margin:0;"/>
+          <span>정책성 대출</span>
+        </label>
+      </div>
+    </div>
+
+    <!-- 금융권 옵션 -->
+    <div id="bankPanel" class="hide" style="margin-top:12px; padding:12px; background:#f9fafb; border-radius:8px;">
+      <label style="font-weight:700; margin-bottom:8px; display:block;">금융권 대출</label>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="bankBorrower" value="general" checked onchange="applyBankPreset()" style="width:auto; margin:0;"/>
+          <span>일반차주</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="bankBorrower" value="first" onchange="applyBankPreset()" style="width:auto; margin:0;"/>
+          <span>생애최초</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="bankBorrower" value="seomin" onchange="applyBankPreset()" style="width:auto; margin:0;"/>
+          <span>서민·실수요자</span>
+        </label>
+      </div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-weight:600; margin-bottom:4px; display:block; font-size:0.9rem;">금융권 구분</label>
+        <select id="bankTier" onchange="applyBankPreset()" style="width:100%; padding:10px; border:1px solid var(--border); border-radius:8px;">
+          <option value="tier1">1금융권 (DSR 40%)</option>
+          <option value="tier2">2금융권 (DSR 50%)</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="speculativeArea" onchange="applyBankPreset()" style="width:auto; margin:0;"/>
+          <span>투기과열지구</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="checkbox" id="capitalArea" onchange="applyBankPreset()" style="width:auto; margin:0;"/>
+          <span>스트레스 DSR +3%</span>
+        </label>
+      </div>
+      <div class="hint">투기과열: LTV 40% + 가격구간별 한도(≤15억 6억 | 15~25억 4억 | >25억 2억) | 서민·실수요자: 연봉 ≤9천, 가격 ≤8억</div>
+    </div>
+
+    <!-- 정책성 옵션 -->
+    <div id="policyPanel" class="hide" style="margin-top:12px; padding:12px; background:#f9fafb; border-radius:8px;">
+      <label style="font-weight:700; margin-bottom:8px; display:block;">정책성 대출 선택</label>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px;">
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="policyType" value="didim" checked onchange="switchPolicy()" style="width:auto; margin:0;"/>
+          <span>디딤돌</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+          <input type="radio" name="policyType" value="bogum" onchange="switchPolicy()" style="width:auto; margin:0;"/>
+          <span>보금자리론</span>
+        </label>
+      </div>
+
+      <div id="didimPanel">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="didimKind" value="normal" checked onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>일반</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="didimKind" value="first" onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>생애최초</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="didimKind" value="newlyweds" onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>신혼·2자녀</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="didimKind" value="newborn" onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>신생아</span>
+          </label>
+        </div>
+        <div class="hint">일반: 연봉 ≤6천, 가격 ≤5억, 한도 2억 | 생애최초: 연봉 ≤7천, 가격 ≤5억, 한도 2.4억 | 신혼·2자녀: 연봉 ≤7천, 가격 ≤6억, 한도 3.2억 | 신생아: 연봉 ≤8.5천, 가격 ≤5억, 한도 4억 | 자산 ≤4.88억</div>
+      </div>
+
+      <div id="bogumPanel" class="hide">
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="bogumKind" value="normal" checked onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>일반</span>
+          </label>
+          <label style="display:flex; align-items:center; gap:4px; cursor:pointer; font-size:0.9rem;">
+            <input type="radio" name="bogumKind" value="first" onchange="applyPolicyPreset()" style="width:auto; margin:0;"/>
+            <span>생애최초</span>
+          </label>
+        </div>
+        <div class="hint">연봉 ≤7천, 가격 ≤6억 | 일반: LTV 60%, 한도 3.6억 | 생애최초: LTV 70%, 한도 4.2억 | DTI 50%</div>
+      </div>
+    </div>
+
+    <div style="margin-top:16px;">
+      <button class="primary-btn" onclick="renderAll()">계산하기</button>
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <div class="dsr-box">
+        <div><span class="pill" id="loanConditionPill">대출 조건</span></div>
+        <div class="dsr-val" id="loanConditionDisplay" style="font-size:0.9rem;">—</div>
+      </div>
+      <div class="dsr-box" style="margin-top:8px;">
+        <div><span class="pill">대출 한도</span></div>
+        <div class="dsr-val" id="dsrLimitDisplay">—</div>
+      </div>
+      <div class="dsr-box" style="margin-top:8px;">
+        <div><span class="pill" style="background:#eef2ff; color:#4f46e5;">가진 자산</span></div>
+        <div class="dsr-val" id="assetDisplay" style="color:#4f46e5;">—</div>
+      </div>
+      <div class="dsr-box" style="margin-top:8px;">
+        <div><span class="pill" style="background:#d1fae5; color:#065f46;">투자 가능 금액</span></div>
+        <div class="dsr-val" id="investableDisplay" style="color:#065f46;">—</div>
+      </div>
+      <div class="note" id="noteArea">
+        색상/투자판정 기준(LTV 열): <b>min(DSR 한도, DTI 한도, LTV 계산액)</b>을 사용해 필요한 자기자본을 산출합니다.<br/>
+        <span id="speculativeNote" style="display:none; color:#991b1b; font-weight:700;">
+          ⚠️ 투기과열지구 선택: LTV 40% 제한 + 가격구간별 대출한도 적용 (≤15억: 6억 | 15~25억: 4억 | >25억: 2억)
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 결과 표 카드 -->
+  <div class="card" id="tableCard">
+    <div class="row" style="margin-bottom:6px">
+      <div><strong>단지가격별 LTV/전세가율 표</strong></div>
+      <div class="hint">단위: 억원</div>
+    </div>
+    <div style="max-height: 60vh; overflow:auto; border:1px solid #eee; border-radius:10px">
+      <table id="resultTable">
+        <thead id="thead"></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    계산 가정: 원리금균등, 기타부채·보험료 등 DSR 공제 없음. 투기과열지구 선택 시 가격구간별 대출한도 적용.<br>
+    <a href="https://blog.naver.com/landlover333" target="_blank">부태리 블로그</a> | Made by 부태리 (2025)
+  </div>
+
+  <!-- 페이지 하단 스크롤 힌트(고정) -->
+  <div class="scroll-hint" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+<script>
+  // 한글 금액 표기
+  function formatAmount(num){
+    if(!num && num!==0) return '';
+    const oku=Math.floor(num/10000), man=num%10000;
+    return (oku>0?(oku+'억 '):'')+(man>0?(man+'만원'):(oku>0?'원':'0'));
+  }
+  function updateHangulAmount(id){
+    const v=parseFloat(document.getElementById(id).value||0);
+    document.getElementById(id+'Text').textContent = v>0 ? formatAmount(Math.floor(v)) : '';
+  }
+
+  // 가진 자산 표시 업데이트
+  function updateAssetDisplay(){
+    const investEok = parseFloat(document.getElementById('investEok').value) || 0;
+    const displayEl = document.getElementById('assetDisplay');
+    const textEl = document.getElementById('investEokText');
+
+    if(investEok > 0){
+      displayEl.textContent = fmtEok(investEok);
+      // 억 단위를 만원으로 변환 (1억 = 10000만원)
+      const manwon = investEok * 10000;
+      textEl.textContent = formatAmount(Math.floor(manwon));
+    } else {
+      displayEl.textContent = '—';
+      textEl.textContent = '';
+    }
+  }
+
+  // 포맷터
+  const toEok = (manwon) => manwon / 10000;
+  const fmtEok = (eok) => isFinite(eok) ? eok.toLocaleString('ko-KR',{minimumFractionDigits:2, maximumFractionDigits:2}) + '억' : '—';
+
+  // UI 스위치
+  function switchDomain(){
+    const domain = document.querySelector('input[name="loanDomain"]:checked').value;
+    const bankPanel = document.getElementById('bankPanel');
+    const policyPanel = document.getElementById('policyPanel');
+
+    if(domain === 'bank'){
+      bankPanel.classList.remove('hide');
+      policyPanel.classList.add('hide');
+      applyBankPreset();
+    } else {
+      bankPanel.classList.add('hide');
+      policyPanel.classList.remove('hide');
+      applyPolicyPreset();
+    }
+  }
+
+  function switchPolicy(){
+    const p = document.querySelector('input[name="policyType"]:checked').value;
+    document.getElementById('didimPanel').classList.toggle('hide', p !== 'didim');
+    document.getElementById('bogumPanel').classList.toggle('hide', p !== 'bogum');
+    applyPolicyPreset();
+  }
+
+  // 금융권 프리셋 적용
+  function applyBankPreset(){
+    const borrower = document.querySelector('input[name="bankBorrower"]:checked').value;
+    const isSpec = document.getElementById('speculativeArea').checked;
+    const tier = document.getElementById('bankTier').value;
+
+    let ltv = 70, dti = 60, dsr = (tier === 'tier2' ? 50 : 40);
+
+    if(borrower === 'first'){
+      ltv = 70; dti = 60;
+    } else if(borrower === 'seomin'){
+      ltv = isSpec ? 60 : 80;
+      dti = 60;
+    } else { // general
+      ltv = isSpec ? 40 : 70;
+      dti = isSpec ? 40 : 60;
+    }
+
+    // LTV/DTI/DSR 표시 업데이트 (renderAll에서 사용)
+    renderAll();
+  }
+
+  // 정책성 프리셋 적용
+  function applyPolicyPreset(){
+    const p = document.querySelector('input[name="policyType"]:checked')?.value;
+    if(!p) return;
+
+    let ltv = 70, dti = 60, dsr = 0;
+
+    if(p === 'didim'){
+      ltv = 70; dti = 60; dsr = 0;
+    } else if(p === 'bogum'){
+      const kind = document.querySelector('input[name="bogumKind"]:checked')?.value;
+      ltv = (kind === 'first') ? 70 : 60;
+      dti = 50; dsr = 0;
+    }
+
+    renderAll();
+  }
+
+  // DSR 40% 한도 (원리금균등)
+  function calcDSRLimitManwon(incomeManwon, annualRatePct, years){
+    if(!incomeManwon || !annualRatePct || !years) return 0;
+    const monthlyPay = (incomeManwon * 0.40) / 12; // 만원
+    const r = (annualRatePct/100) / 12;
+    const n = years * 12;
+    if(r === 0) return monthlyPay * n; // 금리 0% 안전처리
+    return monthlyPay * (1 - Math.pow(1+r, -n)) / r; // 만원
+  }
+
+  // ✅ 70% → 40%까지 전세가율을 간격(step%)로 생성
+  function buildJeonseRates(stepPct){
+    let step = Number(stepPct);
+    if(!isFinite(step) || step <= 0) step = 10;
+    if(step > 30) step = 30; // 안전상한
+    const rates = [];
+    for(let p = 70; p >= 40 - 1e-9; p -= step){
+      // 40% 아래로 내려가면 강제로 40%를 마지막에 포함
+      if(p < 40 && rates[rates.length-1] !== 40) { rates.push(40); break; }
+      rates.push(Math.round(p * 100) / 100); // 소수 입력 대비 반올림
+      if(p === 40) break;
+    }
+    // 중복/정렬 보정
+    const uniq = [...new Set(rates.map(v=>Math.max(40, Math.min(70, v))))];
+    uniq.sort((a,b)=>b-a);
+    if(uniq[uniq.length-1] !== 40) uniq.push(40);
+    return uniq.map(v=>v/100); // 소수(0.7, 0.65...)로 반환
+  }
+
+  // ✅ 동적 테이블 헤더 구성
+  function renderHeader(jeonseRates, isSpeculative){
+    const thead = document.getElementById('thead');
+    thead.innerHTML = '';
+
+    const tr1 = document.createElement('tr');
+    const thPrice = document.createElement('th');
+    thPrice.rowSpan = 2; thPrice.textContent = '가격';
+    tr1.appendChild(thPrice);
+
+    const thLtvGrp = document.createElement('th');
+    thLtvGrp.colSpan = 4; thLtvGrp.classList.add('sep');
+    thLtvGrp.textContent = isSpeculative ? '대출액 (LTV, 투기과열 구간한도 적용)' : '대출액 (LTV)';
+    tr1.appendChild(thLtvGrp);
+
+    const thJeonseGrp = document.createElement('th');
+    thJeonseGrp.colSpan = jeonseRates.length;
+    if(isSpeculative){
+      thJeonseGrp.innerHTML = '전세금 (전세가율)<br/><span style="color:#dc2626; font-size:0.85em; font-weight:700;">⚠️ 토지거래허가구역은 일반적인 갭투자 불가</span>';
+    } else {
+      thJeonseGrp.textContent = '전세금 (전세가율)';
+    }
+    tr1.appendChild(thJeonseGrp);
+
+    const tr2 = document.createElement('tr');
+    ['70%','60%','50%','40%'].forEach((txt, idx)=>{
+      const th = document.createElement('th');
+      th.textContent = 'LTV ' + txt;
+      if(idx === 3) th.classList.add('sep');
+      tr2.appendChild(th);
+    });
+
+    jeonseRates.forEach(r=>{
+      const th = document.createElement('th');
+      th.textContent = '전세가율 ' + Math.round(r*100) + '%';
+      tr2.appendChild(th);
+    });
+
+    thead.appendChild(tr1);
+    thead.appendChild(tr2);
+  }
+
+  function buildTable(minEok, maxEok, stepEok, investEok, dsrLimitEok, dtiLimitEok, jeonseRates, isSpeculative, baseLtv, productCap, finalLoanLimitEok, maxPriceEok, domain, policyType, policyKind, investableEok){
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+    const ltvRates = [0.70, 0.60, 0.50, 0.40];
+
+    // 보정
+    if(maxEok < minEok){ const t=minEok; minEok=maxEok; maxEok=t; }
+    if(stepEok <= 0) stepEok = 1;
+
+    for(let priceEok = minEok; priceEok <= maxEok + 1e-9; priceEok += stepEok){
+      const tr = document.createElement('tr');
+
+      // 가격 제한 초과 여부 체크
+      const isPriceExceeded = isFinite(maxPriceEok) && priceEok > maxPriceEok;
+
+      // 가격
+      const tdPrice = document.createElement('td');
+      tdPrice.textContent = fmtEok(priceEok);
+      if(isPriceExceeded){
+        tdPrice.style.color = '#dc2626';
+        tdPrice.style.fontWeight = '700';
+        tdPrice.title = '⚠️ 선택한 대출 상품의 가격 제한 초과';
+      }
+      tr.appendChild(tdPrice);
+
+      // ✅ 투기과열지구: 가격구간별 대출한도
+      let priceBandCap = Infinity;
+      if(isSpeculative){
+        const priceManwon = priceEok * 10000;
+        if(priceManwon <= 150000){
+          priceBandCap = 6; // 15억 이하 → 6억
+        } else if(priceManwon <= 250000){
+          priceBandCap = 4; // 15~25억 → 4억
+        } else {
+          priceBandCap = 2; // 25억 초과 → 2억
+        }
+      }
+
+      // LTV 대출액
+      ltvRates.forEach((r, idx)=>{
+        // 표시용 LTV 계산: 단순히 가격 × LTV 비율
+        const baseLoanEok = priceEok * r; // 표 헤더의 LTV (70%, 50%, 40%)
+        // 표기용: 투기과열지구만 가격구간별 한도 적용
+        let ltvCappedEok = baseLoanEok;
+        if(isSpeculative && isFinite(priceBandCap)){
+          ltvCappedEok = Math.min(ltvCappedEok, priceBandCap);
+        }
+
+        // ✅ 판정용 LTV: 투기과열지구/대출 조건에 따라 제한
+        let effectiveLtvRate = r;
+        if(isSpeculative && r > 0.40){
+          effectiveLtvRate = 0.40;
+        }
+        // ✅ 선택된 대출 조건의 기본 LTV 적용
+        if(r > baseLtv){
+          effectiveLtvRate = Math.min(effectiveLtvRate, baseLtv);
+        }
+
+        const actualLoanEok = priceEok * effectiveLtvRate; // 실제 적용되는 LTV 계산액
+
+        // 한도 캡
+        const dsrCap = (dsrLimitEok > 0) ? dsrLimitEok : Infinity;
+        const dtiCap = (dtiLimitEok > 0) ? dtiLimitEok : Infinity;
+
+        // ✅ 판정용: DTI, DSR, 실제LTV, 가격구간캡(투기과열만), 상품한도 중 최소값
+        const effectiveLoanEok = Math.min(actualLoanEok, dsrCap, dtiCap, priceBandCap, productCap);
+
+        const needEquityEok = priceEok - effectiveLoanEok; // 필요 자기자본(판정기준)
+        const td = document.createElement('td');
+
+        // 표시용 대출금 계산: 대출 한도를 먼저 사용
+        let displayLoanEok = Math.min(ltvCappedEok, finalLoanLimitEok);
+
+        // 상품 한도도 적용
+        if(isFinite(productCap)){
+          displayLoanEok = Math.min(displayLoanEok, productCap);
+        }
+
+        // 투기과열지구: 가격구간별 한도도 적용
+        if(isSpeculative && isFinite(priceBandCap)){
+          displayLoanEok = Math.min(displayLoanEok, priceBandCap);
+        }
+
+        const displayEquityEok = priceEok - displayLoanEok; // 필요한 내 자산
+
+        // 가격 제한 초과 시 회색 처리
+        if(isPriceExceeded){
+          td.style.background = '#f3f4f6';
+          td.style.opacity = '0.5';
+          td.title = '⚠️ 선택한 대출 상품의 가격 제한 초과';
+        } else if(isSpeculative && r > baseLtv){
+          // 투기과열지구에서 선택한 대출 상품의 LTV 초과 열은 제한된 스타일 적용
+          td.classList.add('ltv-restricted');
+          td.title = `⚠️ 투기과열지구 선택 대출 상품 LTV ${Math.round(baseLtv*100)}% 초과`;
+        } else if(domain === 'policy' && policyType === 'bogum' && policyKind === 'normal' && r > baseLtv){
+          // 보금자리론 일반(LTV 60%)에서 70% 열은 주황색 명암 처리
+          td.classList.add('invest-low');
+          td.style.opacity = '0.7';
+          td.title = '⚠️ 보금자리론 일반은 LTV 60%까지만 가능';
+        } else {
+          // 색상 판정: 투자 가능 금액 이내 && 대출 한도 이내 && LTV 허용 범위 이내면 파란색
+          const epsilon = 0.01; // 부동소수점 오차 허용 범위 (0.01억 = 100만원)
+          const isWithinInvestable = priceEok <= investableEok + epsilon;
+          const isLtvAllowed = r <= baseLtv + 0.001; // LTV도 약간의 오차 허용
+          const hasEnoughAsset = investEok >= displayEquityEok - epsilon;
+
+          if(isWithinInvestable && isLtvAllowed && hasEnoughAsset){
+            td.classList.add('invest-ok');
+          } else {
+            td.classList.add('invest-low');
+          }
+        }
+
+        if(idx === 3) td.classList.add('sep'); // LTV/전세 구분선
+
+        // 대출금을 먼저 표시하고 내 자산을 나중에 표시
+        td.innerHTML = `<div style="line-height:1.3;">대출 ${fmtEok(displayLoanEok)}<br/><span style="font-size:0.85em; color:#666;">내 자산 ${fmtEok(displayEquityEok)}</span></div>`;
+
+        const bandCapInfo = isSpeculative ? `, 가격구간:${fmtEok(priceBandCap===Infinity?NaN:priceBandCap)}` : '';
+        const prodCapInfo = isFinite(productCap) ? `, 상품한도:${fmtEok(productCap)}` : '';
+        const ltvInfo = effectiveLtvRate !== r ? ` (실제적용 LTV ${Math.round(effectiveLtvRate*100)}%로 제한)` : '';
+        td.title = `내 자산: ${fmtEok(needEquityEok)} / 대출금: ${fmtEok(ltvCappedEok)} (가격×${Math.round(r*100)}%)
+판정근거: min(DTI:${fmtEok(dtiCap===Infinity?NaN:dtiCap)}, DSR:${fmtEok(dsrCap===Infinity?NaN:dsrCap)}, 실제LTV:${fmtEok(actualLoanEok)}${bandCapInfo}${prodCapInfo}) = ${fmtEok(effectiveLoanEok)}${ltvInfo}
+필요자본: ${fmtEok(needEquityEok)} / 보유: ${fmtEok(investEok)}`;
+        tr.appendChild(td);
+      });
+
+      // 전세가율 (DSR 미적용: 갭=가격−전세금 기준)
+      jeonseRates.forEach(r=>{
+        const jeonseEok = priceEok * r;           // 전세금(억)
+        const gapEok = priceEok - jeonseEok;      // 필요자본(갭)
+        const td = document.createElement('td');
+
+        if(isPriceExceeded){
+          td.style.background = '#f3f4f6';
+          td.style.opacity = '0.5';
+          td.title = '⚠️ 선택한 대출 상품의 가격 제한 초과';
+        } else if(investEok >= gapEok){
+          td.classList.add('invest-ok');
+        } else {
+          td.classList.add('invest-low');
+        }
+
+        // 투자금(갭)과 전세금을 함께 표시
+        td.innerHTML = `<div style="line-height:1.3;">${fmtEok(gapEok)}<br/><span style="font-size:0.85em; color:#666;">전세 ${fmtEok(jeonseEok)}</span></div>`;
+        td.title = `투자금(갭): ${fmtEok(gapEok)} / 전세금: ${fmtEok(jeonseEok)} / 보유: ${fmtEok(investEok)}`;
+        tr.appendChild(td);
+      });
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderAll(){
+    const income = parseFloat(document.getElementById('income').value);
+    const rate   = parseFloat(document.getElementById('rate').value);
+    const years  = parseFloat(document.getElementById('years').value);
+
+    const investEok = parseFloat(document.getElementById('investEok').value) || 0;
+    const minEok = parseFloat(document.getElementById('minEok').value) || 6;
+    const maxEok = parseFloat(document.getElementById('maxEok').value) || 30;
+    const stepEok = parseFloat(document.getElementById('stepEok').value) || 1;
+
+    const jeonseStepPct = parseFloat(document.getElementById('jeonseStepPct').value) || 10;
+    const jeonseRates = buildJeonseRates(jeonseStepPct);
+
+    // ✅ 대출 조건 계산
+    const domain = document.querySelector('input[name="loanDomain"]:checked').value;
+    const isCapital = document.getElementById('capitalArea')?.checked || false;
+    const isSpeculative = document.getElementById('speculativeArea')?.checked || false;
+
+    let ltv = 0.70, dti = 0.60, dsr = 0.40;
+    let productCap = Infinity;
+    let maxIncome = Infinity; // 최대 연봉 제한 (만원)
+    let maxPrice = Infinity; // 최대 주택가격 제한 (억)
+    let eligibilityWarning = ''; // 자격 경고 메시지
+
+    if(domain === 'bank'){
+      const borrower = document.querySelector('input[name="bankBorrower"]:checked').value;
+      const tier = document.getElementById('bankTier').value;
+
+      dsr = (tier === 'tier2' ? 0.50 : 0.40);
+
+      if(borrower === 'first'){
+        ltv = 0.70; dti = 0.60;
+      } else if(borrower === 'seomin'){
+        ltv = isSpeculative ? 0.60 : 0.80;
+        dti = 0.60;
+        maxIncome = 9000; // 연봉 9천만원 이하
+        maxPrice = 8; // 주택가격 8억 이하
+      } else { // general
+        ltv = isSpeculative ? 0.40 : 0.70;
+        dti = isSpeculative ? 0.40 : 0.60;
+      }
+    } else { // policy
+      const p = document.querySelector('input[name="policyType"]:checked').value;
+      dsr = 0; // 정책성은 DSR 없음
+
+      if(p === 'didim'){
+        const kind = document.querySelector('input[name="didimKind"]:checked').value;
+        ltv = 0.70; dti = 0.60;
+
+        if(kind === 'normal'){
+          productCap = 2;
+          maxIncome = 6000; // 연봉 6천만원 이하
+          maxPrice = 5; // 5억 이하
+        } else if(kind === 'first'){
+          productCap = 2.4;
+          maxIncome = 7000; // 연봉 7천만원 이하
+          maxPrice = 5; // 5억 이하
+        } else if(kind === 'newlyweds'){
+          productCap = 3.2;
+          maxIncome = 7000; // 연봉 7천만원 이하
+          maxPrice = 6; // 6억 이하
+        } else { // newborn
+          productCap = 4;
+          maxIncome = 8500; // 연봉 8.5천만원 이하
+          maxPrice = 5; // 5억 이하
+        }
+      } else { // bogum
+        const kind = document.querySelector('input[name="bogumKind"]:checked').value;
+        ltv = (kind === 'first') ? 0.70 : 0.60;
+        dti = 0.50;
+        maxIncome = 7000; // 부부합산 연소득 7천만원 이하
+        maxPrice = 6; // 6억 이하
+        productCap = (kind === 'first') ? 4.2 : 3.6;
+      }
+    }
+
+    // 자격 조건 체크
+    if(income > maxIncome){
+      eligibilityWarning = `⚠️ 연봉 제한 초과: 최대 ${(maxIncome/10000).toFixed(1)}억원 이하만 신청 가능`;
+    }
+
+    // 디딤돌 대출 자산 제한 체크 (4.88억 초과 불가)
+    if(domain === 'policy'){
+      const p = document.querySelector('input[name="policyType"]:checked').value;
+      if(p === 'didim' && investEok > 4.88){
+        if(eligibilityWarning) eligibilityWarning += '\n';
+        else eligibilityWarning = '';
+        eligibilityWarning += '⚠️ 디딤돌 대출: 자산 4.88억 초과 시 신청 불가';
+      }
+    }
+
+    // DTI 한도 계산
+    const dtiLimitManwon = calcDTILimitManwon(income, rate, years, dti);
+    const dtiLimitEok = toEok(dtiLimitManwon);
+
+    // DSR 한도 계산 (수도권 스트레스 +3% 반영)
+    let dsrLimitManwon = 0, dsrLimitEok = 0;
+    if(dsr > 0){
+      const stressRate = (domain === 'bank' && isCapital) ? (rate + 3) : rate;
+      dsrLimitManwon = calcDSRLimitWithStress(income, stressRate, years, dsr);
+      dsrLimitEok = toEok(dsrLimitManwon);
+    }
+
+    // LTV 한도 계산 (자산 기반: 자산 * ltv/(1-ltv))
+    const ltvLimitEok = (ltv > 0 && ltv < 1 && investEok > 0)
+      ? (investEok * (ltv / (1 - ltv)))
+      : Infinity;
+
+    // 대출 한도: LTV, DTI, DSR, 상품한도 중 최소값
+    const limits = [
+      {name: 'LTV', value: ltvLimitEok},
+      {name: 'DTI', value: dtiLimitEok},
+      ...(dsr > 0 ? [{name: 'DSR', value: dsrLimitEok}] : []),
+      ...(isFinite(productCap) ? [{name: '상품한도', value: productCap}] : [])
+    ];
+    const minLimit = limits.length > 0 ? limits.reduce((min, curr) => curr.value < min.value ? curr : min, limits[0]) : {name: 'DTI', value: dtiLimitEok};
+    let finalLoanLimitEok = minLimit.value;
+
+    // ✅ 투기과열지구: 투자 가능 금액(자산+대출한도) 기준으로 가격구간별 한도 적용
+    let appliedBandCap = null;
+    if(isSpeculative && isFinite(finalLoanLimitEok)){
+      const potentialInvestableEok = investEok + finalLoanLimitEok;
+      const potentialInvestableManwon = potentialInvestableEok * 10000;
+
+      let globalPriceBandCap = Infinity;
+      if(potentialInvestableManwon > 250000){
+        globalPriceBandCap = 2; // 25억 초과 → 2억
+        appliedBandCap = '2억';
+      } else if(potentialInvestableManwon > 150000){
+        globalPriceBandCap = 4; // 15억 초과 → 4억
+        appliedBandCap = '4억';
+      } else {
+        globalPriceBandCap = 6; // 15억 이하 → 6억
+        appliedBandCap = '6억';
+      }
+      finalLoanLimitEok = Math.min(finalLoanLimitEok, globalPriceBandCap);
+    }
+
+    // 투자 가능 금액 = 가진 자산 + 대출 한도
+    let investableEok = investEok + finalLoanLimitEok;
+
+    // 정책성 대출: 가격 한도 적용 (디딤돌/보금자리론)
+    if(domain === 'policy' && isFinite(maxPrice)){
+      investableEok = Math.min(investableEok, maxPrice);
+    }
+
+    // 표시 업데이트
+    // 1. 대출 조건 표시
+    const loanConditionText = `LTV ${Math.round(ltv*100)}% | DTI ${Math.round(dti*100)}%${dsr > 0 ? ` | DSR ${Math.round(dsr*100)}%` : ''}`;
+    document.getElementById('loanConditionDisplay').textContent = loanConditionText;
+
+    // 2. 대출 한도 표시 (최소값 기준)
+    let loanLimitText = '연봉·금리·기간을 입력하세요';
+    if(income > 0 && isFinite(finalLoanLimitEok)){
+      loanLimitText = `${fmtEok(finalLoanLimitEok)} (${minLimit.name} 기준${isCapital && minLimit.name === 'DSR' ? ' +3%스트레스' : ''})`;
+      if(isSpeculative && appliedBandCap){
+        loanLimitText += ` | 투기과열 ${appliedBandCap} 한도 적용`;
+      }
+      if(eligibilityWarning){
+        loanLimitText += `\n${eligibilityWarning}`;
+      }
+    }
+    document.getElementById('dsrLimitDisplay').textContent = loanLimitText;
+    document.getElementById('dsrLimitDisplay').style.whiteSpace = 'pre-line';
+    // 경고 메시지가 있으면 빨간색으로 표시
+    if(eligibilityWarning){
+      document.getElementById('dsrLimitDisplay').style.color = '#dc2626';
+    } else {
+      document.getElementById('dsrLimitDisplay').style.color = '';
+    }
+
+    // 3. 투자 가능 금액 표시
+    const investableText = income > 0 && investEok > 0 && isFinite(finalLoanLimitEok)
+      ? fmtEok(investableEok)
+      : '—';
+    document.getElementById('investableDisplay').textContent = investableText;
+
+    // 노트 표시/숨김
+    const noteEl = document.getElementById('speculativeNote');
+    if(noteEl) noteEl.style.display = isSpeculative ? 'inline' : 'none';
+
+    // 정책성 대출 종류 확인
+    let policyType = null;
+    let policyKind = null;
+    if(domain === 'policy'){
+      policyType = document.querySelector('input[name="policyType"]:checked')?.value;
+      if(policyType === 'bogum'){
+        policyKind = document.querySelector('input[name="bogumKind"]:checked')?.value;
+      }
+    }
+
+    // 헤더 & 표 렌더
+    renderHeader(jeonseRates, isSpeculative);
+    buildTable(minEok, maxEok, stepEok, investEok, dsrLimitEok, dtiLimitEok, jeonseRates, isSpeculative, ltv, productCap, finalLoanLimitEok, maxPrice, domain, policyType, policyKind, investableEok);
+  }
+
+  // DTI 한도 계산
+  function calcDTILimitManwon(incomeManwon, annualRatePct, years, dtiRatio){
+    if(!incomeManwon || !annualRatePct || !years) return 0;
+    const monthlyRate = (annualRatePct/100) / 12;
+    const months = years * 12;
+    const annuityFactor = monthlyRate === 0
+      ? 1 / months
+      : (monthlyRate * Math.pow(1 + monthlyRate, months)) / (Math.pow(1 + monthlyRate, months) - 1);
+    const yearlyRepaymentPerLoan = annuityFactor * 12;
+    return (incomeManwon * dtiRatio) / yearlyRepaymentPerLoan;
+  }
+
+  // DSR 한도 계산 (스트레스 금리 반영)
+  function calcDSRLimitWithStress(incomeManwon, annualRatePct, years, dsrRatio){
+    if(!incomeManwon || !annualRatePct || !years) return 0;
+    const monthlyPay = (incomeManwon * dsrRatio) / 12;
+    const r = (annualRatePct/100) / 12;
+    const n = years * 12;
+    if(r === 0) return monthlyPay * n;
+    return monthlyPay * (1 - Math.pow(1+r, -n)) / r;
+  }
+
+  // 하단 스크롤 힌트 로직
+  function updateBottomHint(){
+    const hint = document.querySelector('.scroll-hint');
+    if(!hint) return;
+    const THRESHOLD = 120;
+    const nearBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - THRESHOLD);
+    hint.classList.toggle('hide', nearBottom);
+  }
+
+  window.addEventListener('scroll', updateBottomHint, {passive:true});
+  window.addEventListener('resize', updateBottomHint);
+
+  // 초기 렌더
+  document.addEventListener('DOMContentLoaded', ()=>{
+    updateAssetDisplay();
+    switchDomain(); // 초기 도메인 설정
+    renderAll();
+    updateBottomHint();
+    setTimeout(updateBottomHint, 80);
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,742 @@
+
+<!DOCTYPE html>
+        <html lang="ko">
+        <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1" name="viewport"/>
+        <title>부태리 신고가 알림 - 2025-10-30 07:06</title>
+        <style>
+          :root {
+            --bg:#F2F2F7; --fg:#111; --sub:#6b7280; --card:#fff; --bd:#e5e7eb;
+            --primary:#007AFF; --primary-dark:#0051D2; --accent:#ff3b30;
+          }
+          *{ box-sizing:border-box }
+          body{
+            margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+            color:var(--fg); background:var(--bg);
+          }
+          .page{ max-width:960px; width:92vw; margin:24px auto 80px }
+          .header{
+            background:linear-gradient(135deg,var(--primary),#63A4FF);
+            color:#fff; border-radius:16px; padding:20px 20px 16px;
+            box-shadow:0 6px 18px rgba(0,0,0,.08);
+          }
+          .header h1{ margin:0 0 8px; font-size:22px; font-weight:800; letter-spacing:-.2px }
+          .header .sub{ margin:0; opacity:.95; font-size:14px }
+
+          .chips{ display:flex; flex-wrap:wrap; gap:8px; margin:12px 0 0 }
+          .chip{
+            display:inline-flex; align-items:center; gap:6px; padding:8px 12px;
+            border:1px solid var(--bd); border-radius:999px; background:#fff; color:#111; font-size:13px;
+            box-shadow:0 1px 1.5px rgba(0,0,0,.04); cursor:pointer;
+            transition: all 0.2s ease;
+          }
+          .chip:hover{ background:#f3f4f6 }
+          .chip.active{ background:#1976d2; color:#fff; border-color:#1976d2 }
+
+          .region-chips{ display:flex; flex-wrap:wrap; gap:8px; margin:10px 0 0 }
+          .region-chip{
+            display:inline-flex; align-items:center; gap:6px; padding:8px 12px;
+            border:1px solid var(--bd); border-radius:999px; background:#fff; color:#111; font-size:13px;
+            box-shadow:0 1px 1.5px rgba(0,0,0,.04); cursor:pointer;
+            transition: all 0.2s ease;
+          }
+          .region-chip:hover{ background:#f3f4f6 }
+          .region-chip.active{ background:#1976d2; color:#fff; border-color:#1976d2 }
+          .region-chip.zero{ opacity:.45; }
+
+          .cards{ display:grid; grid-template-columns:repeat(12,1fr); gap:12px; margin-top:16px }
+          .card{
+            grid-column:span 12; background:var(--card); border:1px solid var(--bd);
+            border-radius:14px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+          }
+          .card:hover{ transform: translateY(-2px); box-shadow:0 4px 20px rgba(0,0,0,.08) }
+          @media(min-width:720px){ .card{ grid-column:span 6 } }
+          .card.hidden{ display:none }
+          .card h3{ margin:0 0 4px; font-size:16px; display:flex; align-items:center; gap:6px }
+
+          .year-badge {
+            display:inline-flex; align-items:center; padding:2px 8px; border-radius:6px;
+            background:#e5e7eb; color:#4b5563; font-size:12px; font-weight:normal;
+          }
+          .year-badge.old { background:#f3e8ff; color:#6b21a8; font-weight:600; }         /* 2000년 미만 */
+          .year-badge.very-young { background:#fce7f3; color:#be185d; font-weight:600; }  /* 5년 이하 */
+          .year-badge.young { background:#dbeafe; color:#1e40af; font-weight:600; }       /* 10년 이하 */
+          .year-badge.new { background:#fef3c7; color:#92400e; font-weight:600; }         /* 분양 */
+
+          .tag{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--bd); background:#fff; color:#333 }
+          .card .card-sub{ color:var(--sub); font-size:13px; margin-bottom:6px }
+          .grid{ display:grid; grid-template-columns:110px 1fr; gap:10px; color:#111; font-size:13px }
+          .grid .k{ color:var(--sub) }
+          .highlight{ color:var(--primary-dark); font-weight:700 }
+          .rise{ color:#e11d48; font-weight:700 }
+          .badge-rank{
+            display:inline-flex; align-items:center; gap:4px; padding:4px 10px; margin-left:6px;
+            border-radius:999px; color:#fff; font-size:12px; font-weight:600;
+            box-shadow:0 2px 4px rgba(0,0,0,0.2); animation:pulse 2s infinite;
+          }
+          .badge-rank.rank-84{ background:linear-gradient(135deg,#fbbf24,#f59e0b); border:1px solid #f59e0b; }
+          .badge-rank.rank-59{ background:linear-gradient(135deg,#8b5cf6,#7c3aed); border:1px solid #7c3aed; }
+          @keyframes pulse{ 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.9;transform:scale(1.02)} }
+
+          .toolbar{ display:flex; gap:8px; align-items:center; margin:8px 0 4px; flex-wrap:wrap }
+          .toolbar input[type="date"], .toolbar input[type="number"]{
+            padding:10px 12px; border:1px solid var(--bd); border-radius:10px; background:#fff; font-size:13px; width:120px;
+          }
+          .toolbar .btn{
+            display:inline-flex; align-items:center; padding:10px 12px; border:1px solid var(--bd);
+            border-radius:999px; background:#fff; font-size:13px; cursor:pointer; transition: all 0.2s ease;
+          }
+          .toolbar .btn:hover{ background:#f3f4f6 }
+
+          footer{ margin:24px 0 0; color:#6b7280; font-size:12px; text-align:center }
+        </style>
+        </head>
+        <body>
+          <div class="page">
+            <header class="header">
+              <h1>부태리 신고가 알림</h1>
+              <p class="sub">2025-10-30 07:06 기준 · 총 134개 아파트</p>
+
+              <!-- 상단 칩: 연식별 필터 -->
+              <div class="chips">
+                <span class="chip" id="chip-old">2000년대 미만 53건</span>
+                <span class="chip" id="chip-very-young">입주 5년 이하 19건</span>
+                <span class="chip" id="chip-young">입주 10년 이하 31건</span>
+              </div>
+
+              <!-- 지역 칩 (동적) -->
+              <div class="region-chips" id="regionChips"></div>
+            </header>
+
+            <!-- 상승률 필터 툴바 -->
+            <div class="toolbar">
+              <label style="font-size:13px;color:var(--sub)">상승률(%)</label>
+              <input id="rateMin" type="number" step="0.1" min="0" placeholder="최소"/>
+              <span style="color:var(--sub)">~</span>
+              <input id="rateMax" type="number" step="0.1" min="0" placeholder="최대"/>
+              <button class="btn" id="btnRate5">≥ 5%</button>
+              <button class="btn" id="btnRate10">≥ 10%</button>
+              <button class="btn" id="btnRateReset">상승률 초기화</button>
+            </div>
+
+            <!-- 날짜 필터 툴바 -->
+            <div class="toolbar">
+              <label style="font-size:13px;color:var(--sub)">기간</label>
+              <input id="dateFrom" type="date" lang="en-CA" placeholder="YYYY-MM-DD" inputmode="numeric" pattern="\d{4}-\d{2}-\d{2}"/>
+              <span style="color:var(--sub)">~</span>
+              <input id="dateTo" type="date" lang="en-CA" placeholder="YYYY-MM-DD" inputmode="numeric" pattern="\d{4}-\d{2}-\d{2}"/>
+              <button class="btn" id="btnToday">오늘</button>
+              <button class="btn" id="btn7">최근 7일</button>
+              <button class="btn" id="btn30">최근 30일</button>
+              <button class="btn" id="btnDateReset">날짜 초기화</button>
+
+              <span style="width:8px"></span>
+              <button class="btn" id="resetBtn">전체 초기화</button>
+            </div>
+
+            <section class="cards" id="cards">
+              
+            <section class="card" data-region="서울특별시 강남구" 
+                     data-build-year="1976" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>현대1차(12,13,21,22,31,32,33동) <span class='year-badge old'>1976년</span> <span class="tag">196㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 강남구 압구정동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">1,305,000만원</span> (2025-08-18 | 6층)</div>
+                <div class="k">직전 최고가</div>
+                <div>950,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">355,000만원 상승 (37.4%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 강남구" 
+                     data-build-year="1976" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>현대2차(10,11,20,23,24,25동) <span class='year-badge old'>1976년</span> <span class="tag">162㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 강남구 압구정동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">860,000만원</span> (2025-10-01 | 4층)</div>
+                <div class="k">직전 최고가</div>
+                <div>410,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">450,000만원 상승 (109.8%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 용산구" 
+                     data-build-year="2007" data-young="0" 
+                     data-very-young="0" data-old="0">
+              <h3>시티파크(2단지) <span class='year-badge'>2007년</span> <span class="tag">145㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 용산구 한강로3가</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">439,000만원</span> (2025-08-25 | 19층)</div>
+                <div class="k">직전 최고가</div>
+                <div>436,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">3,000만원 상승 (0.7%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 서초구" 
+                     data-build-year="2025" data-young="1" 
+                     data-very-young="1" data-old="0">
+              <h3>래미안 원페를라 <span class='year-badge new'>분양</span> <span class="tag">84㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 서초구 방배동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">375,000만원</span> (2025-10-29 | 11층)</div>
+                <div class="k">직전 최고가</div>
+                <div>356,019만원</div>
+                <div class="k">변화</div>
+                <div class="rise">18,981만원 상승 (5.3%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 강남구" 
+                     data-build-year="1983" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>개포주공6단지 <span class='year-badge old'>1983년</span> <span class="tag">83㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 강남구 개포동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">370,000만원</span> (2025-09-10 | 10층)</div>
+                <div class="k">직전 최고가</div>
+                <div>345,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">25,000만원 상승 (7.2%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    <span class="badge-rank rank-59">강남구 59타입 NO.3 단지</span>
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 강남구" 
+                     data-build-year="1983" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>개포주공6단지 <span class='year-badge old'>1983년</span> <span class="tag">60㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 강남구 개포동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">330,000만원</span> (2025-10-13 | 11층)</div>
+                <div class="k">직전 최고가</div>
+                <div>305,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">25,000만원 상승 (8.2%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    <span class="badge-rank rank-59">강남구 59타입 NO.3 단지</span>
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 광진구" 
+                     data-build-year="1978" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>워커힐 <span class='year-badge old'>1978년</span> <span class="tag">166㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 광진구 광장동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">330,000만원</span> (2025-09-30 | 10층)</div>
+                <div class="k">직전 최고가</div>
+                <div>327,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">3,000만원 상승 (0.9%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 송파구" 
+                     data-build-year="1981" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>우성아파트 <span class='year-badge old'>1981년</span> <span class="tag">96㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 송파구 잠실동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">310,000만원</span> (2025-10-10 | 2층)</div>
+                <div class="k">직전 최고가</div>
+                <div>305,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">5,000만원 상승 (1.6%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 송파구" 
+                     data-build-year="2005" data-young="0" 
+                     data-very-young="0" data-old="0">
+              <h3>롯데캐슬골드 <span class='year-badge'>2005년</span> <span class="tag">148㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 송파구 신천동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">300,000만원</span> (2025-09-16 | 28층)</div>
+                <div class="k">직전 최고가</div>
+                <div>270,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">30,000만원 상승 (11.1%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 마포구" 
+                     data-build-year="2020" data-young="1" 
+                     data-very-young="1" data-old="0">
+              <h3>마포그랑자이 <span class='year-badge very-young'>2020년</span> <span class="tag">96㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 마포구 대흥동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">288,000만원</span> (2025-10-14 | 11층)</div>
+                <div class="k">직전 최고가</div>
+                <div>205,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">83,000만원 상승 (40.5%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    <span class="badge-rank rank-84">마포구 84타입 NO.4 단지</span>
+                    <span class="badge-rank rank-59">마포구 59타입 NO.5 단지</span>
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 송파구" 
+                     data-build-year="1988" data-young="0" 
+                     data-very-young="0" data-old="1">
+              <h3>올림픽훼밀리타운 <span class='year-badge old'>1988년</span> <span class="tag">117㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 송파구 문정동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">287,000만원</span> (2025-10-27 | 3층)</div>
+                <div class="k">직전 최고가</div>
+                <div>279,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">8,000만원 상승 (2.9%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 강남구" 
+                     data-build-year="2000" data-young="0" 
+                     data-very-young="0" data-old="0">
+              <h3>삼성동롯데아파트 <span class='year-badge'>2000년</span> <span class="tag">84㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 강남구 삼성동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">275,000만원</span> (2025-10-03 | 10층)</div>
+                <div class="k">직전 최고가</div>
+                <div>230,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">45,000만원 상승 (19.6%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+            <section class="card" data-region="서울특별시 마포구" 
+                     data-build-year="2008" data-young="0" 
+                     data-very-young="0" data-old="0">
+              <h3>반도유보라아일랜드 <span class='year-badge'>2008년</span> <span class="tag">122㎡</span></h3>
+              <div class="card-sub">📍 서울특별시 마포구 현석동</div>
+              <div class="grid">
+                <div class="k">이번 실거래</div>
+                <div><span class="highlight">265,000만원</span> (2025-10-15 | 5층)</div>
+                <div class="k">직전 최고가</div>
+                <div>195,000만원</div>
+                <div class="k">변화</div>
+                <div class="rise">70,000만원 상승 (35.9%)</div>
+                <div class="k">특이사항</div>
+                <div>
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+
+                    
+                    
+                </div>
+              </div>
+            </section>
+            
+            </section>
+
+            <footer>© 부태리의 실거래가 모니터링 시스템</footer>
+          </div>
+
+        <script>
+        (function(){
+          const $  = (s, r=document)=>r.querySelector(s);
+          const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+
+          const cards = $$('.card');
+          const headerSub = $('.header .sub');
+          const chipsWrap = $('#regionChips');
+
+          /* === 날짜 필터 요소 === */
+          const dateFrom = $('#dateFrom');
+          const dateTo   = $('#dateTo');
+          const btnToday = $('#btnToday');
+          const btn7     = $('#btn7');
+          const btn30    = $('#btn30');
+          const btnDateReset = $('#btnDateReset');
+
+          /* === 상승률 필터 요소 === */
+          const rateMin = $('#rateMin');
+          const rateMax = $('#rateMax');
+          const btnRate5 = $('#btnRate5');
+          const btnRate10 = $('#btnRate10');
+          const btnRateReset = $('#btnRateReset');
+
+          /* === 전체 초기화 버튼 === */
+          const resetBtn = $('#resetBtn');
+
+          /* === 연식 칩 상태 === */
+          let selectedRegion = '__ALL__';
+          let filterYoung = false;
+          let filterVeryYoung = false;
+          let filterOld = false;
+
+          /* ===== 유틸 ===== */
+          function toInputValue(d){
+            const y = d.getFullYear();
+            const m = String(d.getMonth()+1).padStart(2,'0');
+            const day = String(d.getDate()).padStart(2,'0');
+            return `${y}-${m}-${day}`;
+          }
+          function todayStr(){ return toInputValue(new Date()); }
+          function daysAgo(n){
+            const d = new Date();
+            d.setDate(d.getDate() - n + 1); // 오늘 포함 n일
+            return d;
+          }
+
+          // '이번 실거래 (YYYY-MM-DD | ...)' 날짜 파싱
+          function parseTradeDate(card){
+            const priceSpan = card.querySelector('.grid .highlight');
+            if(!priceSpan) return null;
+            const cell = priceSpan.parentElement;
+            const text = (cell.textContent || '').trim();
+            const m = text.match(/\((\d{4}-\d{2}-\d{2})[^\)]*\)/);
+            return m ? new Date(m[1]) : null;
+          }
+
+          // 변화 영역에서 상승률 % 파싱 → 숫자
+          function parseRisePct(card){
+            const changeEl = card.querySelector('.grid .rise');
+            if(!changeEl) return null;
+            const text = changeEl.textContent || '';
+            const m = text.match(/(\d+(?:\.\d+)?)%/);
+            return m ? parseFloat(m[1]) : null;
+          }
+
+          // 초기 지역 목록
+// 초기 지역 목록
+const allRegions = Array.from(new Set(cards.map(c => c.dataset.region || '').filter(Boolean)));
+
+// 지역칩 렌더 (처음 1회)
+function renderRegionChips(){
+  chipsWrap.innerHTML = '';
+  const allChip = document.createElement('span');
+  allChip.className = 'region-chip active';
+  allChip.dataset.region = '__ALL__';
+  allChip.textContent = '전체 보기';
+  chipsWrap.appendChild(allChip);
+
+  // 각 지역의 초기 카드 수를 계산
+  const regionCounts = new Map();
+  allRegions.forEach(r => {
+    const count = cards.filter(card => card.dataset.region === r).length;
+    regionCounts.set(r, count);
+  });
+
+  // 카드 수가 많은 순으로 정렬
+  const sortedRegions = allRegions.sort((a, b) => {
+    return regionCounts.get(b) - regionCounts.get(a);
+  });
+
+  sortedRegions.forEach(r=>{
+    const chip = document.createElement('span');
+    chip.className = 'region-chip';
+    chip.dataset.region = r;
+    chip.textContent = `${r} 0건`;
+    chipsWrap.appendChild(chip);
+  });
+}
+
+// 지역칩 숫자 갱신(지역 제외 모든 필터 반영)
+function refreshRegionChips(){
+  // 현재 지역을 제외한 필터로 일치하는 카드만 카운팅
+  const counts = new Map(allRegions.map(r=>[r,0]));
+  cards.forEach(card=>{
+    if(nonRegionMatch(card)){ // 지역 조건 제외
+      const r = card.dataset.region || '';
+      if(counts.has(r)) counts.set(r, counts.get(r)+1);
+    }
+  });
+
+  // 카드 수가 많은 순으로 지역 정렬
+  const sortedRegions = [...allRegions].sort((a, b) => {
+    return counts.get(b) - counts.get(a);
+  });
+
+  // 기존 칩들을 모두 제거하고 다시 렌더링
+  chipsWrap.innerHTML = '';
+  
+  // '전체 보기' 칩 추가
+  const allChip = document.createElement('span');
+  allChip.className = 'region-chip';
+  allChip.dataset.region = '__ALL__';
+  allChip.textContent = '전체 보기';
+  allChip.classList.toggle('active', selectedRegion === '__ALL__');
+  chipsWrap.appendChild(allChip);
+
+  // 정렬된 순서대로 지역 칩 추가
+  sortedRegions.forEach(r=>{
+    const n = counts.get(r) || 0;
+    const chip = document.createElement('span');
+    chip.className = 'region-chip';
+    chip.dataset.region = r;
+    chip.textContent = `${r} ${n}건`;
+    chip.classList.toggle('zero', n === 0);
+    chip.classList.toggle('active', r === selectedRegion);
+    chipsWrap.appendChild(chip);
+  });
+}
+
+          // 헤더 카운트 갱신
+          function setHeaderCount(n){
+            if(!headerSub) return;
+            // 원문에서 날짜·총 N개 패턴 앞부분만 추출
+            const base = headerSub.textContent.replace(/· 총\s+\d+\s*개\s*아파트(?:\s*\(필터 적용\))?/,'').trim();
+            const filterOn = (
+              dateFrom.value || dateTo.value || filterYoung || filterVeryYoung || filterOld ||
+              selectedRegion !== '__ALL__' || rateMin.value || rateMax.value
+            );
+            const filterBadge = filterOn ? ' (필터 적용)' : '';
+            headerSub.textContent = `${base} · 총 ${n}개 아파트${filterBadge}`;
+          }
+
+          /* ===== 필터 판정 로직 ===== */
+          function nonRegionMatch(card){
+            // 날짜
+            const fromVal = dateFrom.value ? new Date(dateFrom.value) : null;
+            const toVal   = dateTo.value ? new Date(dateTo.value) : null;
+            const d = parseTradeDate(card);
+            const passDate =
+              (!fromVal || (d && d >= fromVal)) &&
+              (!toVal   || (d && d <= toVal));
+
+            // 연식
+            const yOldOn   = filterOld;
+            const yVYOn    = filterVeryYoung;
+            const yYoungOn = filterYoung;
+            const yearFilterOn = yOldOn || yVYOn || yYoungOn;
+            const isOld   = card.dataset.old === '1';
+            const isVY    = card.dataset.veryYoung === '1';
+            const isYoung = card.dataset.young === '1';
+            const passYear = !yearFilterOn || (
+              (yOldOn   && isOld) ||
+              (yVYOn    && isVY)  ||
+              (yYoungOn && isYoung)
+            );
+
+            // 상승률
+            const minPct = rateMin.value !== '' ? parseFloat(rateMin.value) : null;
+            const maxPct = rateMax.value !== '' ? parseFloat(rateMax.value) : null;
+            const rateFilterOn = (minPct !== null) || (maxPct !== null);
+            const pct = parseRisePct(card);
+            const passRate = !rateFilterOn || (
+              (minPct === null || (pct !== null && pct >= minPct)) &&
+              (maxPct === null || (pct !== null && pct <= maxPct))
+            );
+
+            return passDate && passYear && passRate;
+          }
+
+          function applyFilter(){
+            const shown = cards.reduce((acc, card)=>{
+              const regionOk = (selectedRegion==='__ALL__') ? true : (card.dataset.region === selectedRegion);
+              const match = nonRegionMatch(card) && regionOk;
+              card.classList.toggle('hidden', !match);
+              return acc + (match ? 1 : 0);
+            }, 0);
+
+            setHeaderCount(shown);
+            refreshRegionChips(); // 카드 표시 후 지역칩 숫자도 즉시 갱신
+          }
+
+          /* ===== 지역칩: 이벤트 위임 ===== */
+          renderRegionChips();
+          chipsWrap.addEventListener('click', (e)=>{
+            const chip = e.target.closest('.region-chip');
+            if(!chip) return;
+            const region = chip.dataset.region;
+            if(!region) return;
+
+            selectedRegion = region;
+            $$('.region-chip', chipsWrap).forEach(c=>{
+              c.classList.toggle('active', c.dataset.region === selectedRegion);
+            });
+            applyFilter();
+          });
+
+          /* ===== 연식 칩 ===== */
+          const oldChip = $('#chip-old');
+          const veryYoungChip = $('#chip-very-young');
+          const youngChip = $('#chip-young');
+
+          if (oldChip){
+            oldChip.addEventListener('click', ()=>{
+              filterOld = !filterOld; filterVeryYoung = false; filterYoung = false;
+              oldChip.classList.toggle('active', filterOld);
+              veryYoungChip.classList.remove('active');
+              youngChip.classList.remove('active');
+              applyFilter();
+            });
+          }
+          if (veryYoungChip){
+            veryYoungChip.addEventListener('click', ()=>{
+              filterVeryYoung = !filterVeryYoung; filterYoung = false; filterOld = false;
+              veryYoungChip.classList.toggle('active', filterVeryYoung);
+              youngChip.classList.remove('active');
+              oldChip.classList.remove('active');
+              applyFilter();
+            });
+          }
+          if (youngChip){
+            youngChip.addEventListener('click', ()=>{
+              filterYoung = !filterYoung; filterVeryYoung = false; filterOld = false;
+              youngChip.classList.toggle('active', filterYoung);
+              veryYoungChip.classList.remove('active');
+              oldChip.classList.remove('active');
+              applyFilter();
+            });
+          }
+
+          /* ===== 날짜 입력/프리셋 ===== */
+          dateFrom.addEventListener('change', ()=>{
+            if(dateTo.value && dateFrom.value && dateFrom.value > dateTo.value){
+              dateTo.value = dateFrom.value;
+            }
+            applyFilter();
+          });
+          dateTo.addEventListener('change', ()=>{
+            if(dateFrom.value && dateTo.value && dateTo.value < dateFrom.value){
+              dateFrom.value = dateTo.value;
+            }
+            applyFilter();
+          });
+
+          $('#btnToday').addEventListener('click', ()=>{
+            const t = todayStr();
+            dateFrom.value = t; dateTo.value = t;
+            applyFilter();
+          });
+          $('#btn7').addEventListener('click', ()=>{
+            dateFrom.value = toInputValue(daysAgo(7));
+            dateTo.value   = todayStr();
+            applyFilter();
+          });
+          $('#btn30').addEventListener('click', ()=>{
+            dateFrom.value = toInputValue(daysAgo(30));
+            dateTo.value   = todayStr();
+            applyFilter();
+          });
+          btnDateReset.addEventListener('click', ()=>{
+            dateFrom.value = '';
+            dateTo.value = '';
+            applyFilter();
+          });
+
+          /* ===== 상승률 입력/프리셋 ===== */
+          function onRateChange(){ applyFilter(); }
+          rateMin.addEventListener('input', onRateChange);
+          rateMax.addEventListener('input', onRateChange);
+          btnRate5.addEventListener('click', ()=>{ rateMin.value = '5';  rateMax.value = ''; applyFilter(); });
+          btnRate10.addEventListener('click',()=>{ rateMin.value = '10'; rateMax.value = ''; applyFilter(); });
+          btnRateReset.addEventListener('click', ()=>{ rateMin.value = ''; rateMax.value = ''; applyFilter(); });
+
+          /* ===== 전체 초기화 ===== */
+          resetBtn.addEventListener('click', ()=>{
+            dateFrom.value = '';
+            dateTo.value   = '';
+            rateMin.value  = '';
+            rateMax.value  = '';
+            filterOld = false;
+            filterVeryYoung = false;
+            filterYoung = false;
+
+            oldChip.classList.remove('active');
+            veryYoungChip.classList.remove('active');
+            youngChip.classList.remove('active');
+
+            selectedRegion = '__ALL__';
+            $$('.region-chip', chipsWrap).forEach(c=> c.classList.toggle('active', c.dataset.region === '__ALL__'));
+            applyFilter();
+          });
+
+          // 최초 렌더 시 숫자 세팅
+          applyFilter();
+        })();
+        </script>
+        </body>
+        </html>

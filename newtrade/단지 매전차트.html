@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>부동산 단지 차트 대시보드</title>
+    <style>
+        :root { --primary-color: #2c3e50; --accent-color: #3498db; --bg-color: #f4f7f6; }
+        body { font-family: 'Pretendard', sans-serif; background-color: var(--bg-color); padding: 20px; margin: 0; }
+        header { text-align: center; margin-bottom: 40px; padding: 20px; }
+        .search-container { max-width: 600px; margin: 0 auto 30px; display: flex; }
+        #searchInput { flex: 1; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; }
+        .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .apt-card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.3s; text-decoration: none; color: inherit; border: 2px solid transparent; text-align: center; }
+        .apt-card:hover { transform: translateY(-5px); border-color: var(--accent-color); }
+        .tag { display: inline-block; background: #eef2f3; color: #7f8c8d; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; margin-top: 15px; }
+        .error-msg { color: red; text-align: center; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>🏢 부동산 단지 차트 저장소</h1>
+    <p>성공적인 투자를 위한 자본 흐름 추적</p>
+</header>
+
+<div class="search-container">
+    <input type="text" id="searchInput" placeholder="단지명 검색..." onkeyup="filterCards()">
+</div>
+
+<div class="dashboard-grid" id="aptGrid">
+    <p id="statusMsg">데이터를 로드하는 중...</p>
+</div>
+
+<script>
+    // GitHub 레포지토리 정보
+    const USERNAME = "richdadtechtree";
+    const REPO = "newtrade";
+    const FOLDER = "단지 매전차트";
+
+    // GitHub API URL (캐시 방지를 위해 timestamp 추가)
+    const API_URL = `https://api.github.com/repos/${USERNAME}/${REPO}/contents/${encodeURIComponent(FOLDER)}?t=${new Date().getTime()}`;
+
+    let htmlFiles = [];
+
+    async function fetchRepoFiles() {
+        const grid = document.getElementById('aptGrid');
+        const statusMsg = document.getElementById('statusMsg');
+
+        try {
+            const response = await fetch(API_URL);
+            
+            if (!response.ok) {
+                throw new Error(`서버 응답 오류: ${response.status} (정보를 찾을 수 없습니다)`);
+            }
+
+            const files = await response.json();
+            
+            // 파일 필터링: .html로 끝나고 index.html이 아닌 것
+            htmlFiles = files.filter(file => 
+                file.name.toLowerCase().endsWith('.html') && 
+                file.name.toLowerCase() !== 'index.html'
+            );
+
+            if (htmlFiles.length === 0) {
+                statusMsg.innerHTML = "저장소에 등록된 .html 파일이 없습니다.";
+                return;
+            }
+
+            statusMsg.style.display = 'none'; // 메시지 숨김
+            renderCards(htmlFiles);
+        } catch (error) {
+            console.error("Error:", error);
+            grid.innerHTML = `<p class="error-msg">⚠️ 오류 발생: ${error.message}<br>레포지토리 이름과 공개 설정을 확인해 주세요.</p>`;
+        }
+    }
+
+    function renderCards(files) {
+        const grid = document.getElementById('aptGrid');
+        grid.innerHTML = files.map(file => {
+            const displayName = file.name.replace('.html', '');
+            // 단지 매전차트 폴더 내 파일 호출
+            return `
+                <a href="./단지 매전차트/${file.name}" class="apt-card">
+                    <h3>${displayName}</h3>
+                    <span class="tag">데이터 분석 보기</span>
+                </a>
+            `;
+        }).join('');
+    }
+
+    function filterCards() {
+        const query = document.getElementById('searchInput').value.toUpperCase();
+        const filtered = htmlFiles.filter(file => file.name.toUpperCase().includes(query));
+        renderCards(filtered);
+    }
+
+    fetchRepoFiles();
+</script>
+
+</body>
+</html>

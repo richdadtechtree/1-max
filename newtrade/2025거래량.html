@@ -1,0 +1,867 @@
+
+<!DOCTYPE html>
+        <html lang="ko">
+        <head>
+        <meta charset="utf-8"/>
+        <meta content="width=device-width, initial-scale=1" name="viewport"/>
+        <title>2025년 거래량 순위 - 2025-12-28 22:54</title>
+        <style>
+          :root {
+            --bg:#F2F2F7; --fg:#111; --sub:#6b7280; --card:#fff; --bd:#e5e7eb;
+            --primary:#007AFF; --primary-dark:#0051D2; --accent:#ff3b30;
+          }
+          *{ box-sizing:border-box }
+          body{
+            margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+            color:var(--fg); background:var(--bg);
+          }
+          .page{ max-width:960px; width:92vw; margin:24px auto 80px }
+          .header{
+            background:linear-gradient(135deg,var(--primary),#63A4FF);
+            color:#fff; border-radius:16px; padding:20px 20px 16px;
+            box-shadow:0 6px 18px rgba(0,0,0,.08);
+          }
+          .header h1{ margin:0 0 8px; font-size:22px; font-weight:800; letter-spacing:-.2px }
+          .header .sub{ margin:0; opacity:.95; font-size:14px }
+
+          .region-filter{
+            margin-top:16px;
+            display:flex; gap:8px; flex-wrap:wrap;
+          }
+          .region-btn{
+            display:inline-flex; align-items:center; padding:8px 16px;
+            border:1px solid rgba(255,255,255,0.3); border-radius:999px;
+            background:rgba(255,255,255,0.2); color:#fff; font-size:13px; font-weight:600;
+            cursor:pointer; transition:all 0.2s ease;
+          }
+          .region-btn:hover{
+            background:rgba(255,255,255,0.3); transform:translateY(-1px);
+          }
+          .region-btn.active{
+            background:#fff; color:var(--primary); border-color:#fff;
+          }
+
+          .cards{ display:flex; flex-direction:column; gap:16px; margin-top:16px }
+          .card{
+            background:var(--card); border:1px solid var(--bd);
+            border-radius:14px; box-shadow:0 2px 12px rgba(0,0,0,.04);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            overflow:hidden;
+          }
+          .card:hover{ transform: translateY(-2px); box-shadow:0 4px 20px rgba(0,0,0,.08) }
+
+          .card-header{
+            background:linear-gradient(135deg,#f8fafc,#e2e8f0);
+            padding:16px 20px;
+            border-bottom:2px solid #cbd5e1;
+          }
+          .card-header.rank-gold{
+            background:linear-gradient(135deg,#fef3c7,#fbbf24);
+            border-bottom:2px solid #f59e0b;
+          }
+          .card-header.rank-silver{
+            background:linear-gradient(135deg,#f1f5f9,#cbd5e1);
+            border-bottom:2px solid #94a3b8;
+          }
+          .card-header.rank-bronze{
+            background:linear-gradient(135deg,#fed7aa,#fb923c);
+            border-bottom:2px solid #ea580c;
+          }
+          .card-header h3{
+            margin:0; font-size:18px; font-weight:700;
+            display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+          }
+
+          .divider{
+            height:2px;
+            background:repeating-linear-gradient(
+              90deg,
+              #cbd5e1 0px,
+              #cbd5e1 10px,
+              transparent 10px,
+              transparent 20px
+            );
+          }
+
+          .card-body{
+            padding:16px 20px;
+            display:flex; flex-direction:column; gap:10px;
+          }
+          .info-row{
+            font-size:14px; line-height:1.6;
+            display:flex; align-items:center; gap:8px;
+          }
+          .info-row strong{ color:var(--primary-dark); font-weight:700; font-size:16px; }
+
+          .year-badge{
+            display:inline-flex; align-items:center; padding:4px 10px;
+            border-radius:6px; font-size:12px; font-weight:600;
+            background:linear-gradient(135deg,#94a3b8,#64748b);
+            color:#fff; box-shadow:0 2px 4px rgba(0,0,0,0.15);
+          }
+          .year-badge.very-young{
+            background:linear-gradient(135deg,#22c55e,#16a34a);
+          }
+          .year-badge.young{
+            background:linear-gradient(135deg,#3b82f6,#2563eb);
+          }
+          .year-badge.new-building{
+            background:linear-gradient(135deg,#f59e0b,#d97706);
+            animation:pulse 2s ease-in-out infinite;
+          }
+          @keyframes pulse{
+            0%,100%{transform:scale(1)}
+            50%{transform:scale(1.05)}
+          }
+        </style>
+        </head>
+        <body>
+        <div class="page">
+          <div class="header">
+            <h1>📊 2025년 거래량 순위</h1>
+            <p class="sub">2025-12-28 22:54 기준 · 평형 무관 · <span id="countDisplay">전체</span></p>
+            <div class="region-filter">
+              <button class="region-btn active" data-region="all">전체</button>
+              <button class="region-btn" data-region="seoul">서울</button>
+              <button class="region-btn" data-region="gyeonggi">경기</button>
+              <button class="region-btn" data-region="incheon">인천</button>
+            </div>
+          </div>
+          <div class="cards">
+            
+            <div class="card" data-region="gyeonggi" data-count="434" data-rank="1">
+              <div class="card-header rank-gold">
+                <h3><span class="rank-number">🥇 1위</span> 래미안안양메가트리아 <span class="year-badge young">2016년 (9년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>434건</strong></div>
+                <div class="info-row">📍 경기도 안양시(경) 안양동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="406" data-rank="2">
+              <div class="card-header rank-silver">
+                <h3><span class="rank-number">🥈 2위</span> 평촌어바인퍼스트 <span class="year-badge very-young">2021년 (4년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>406건</strong></div>
+                <div class="info-row">📍 경기도 안양시(경) 호계동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="354" data-rank="3">
+              <div class="card-header rank-bronze">
+                <h3><span class="rank-number">🥉 3위</span> 세이지움개봉 <span class="year-badge very-young">2025년 (0년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>354건</strong></div>
+                <div class="info-row">📍 서울특별시 구로구 개봉동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="337" data-rank="4">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 4위</span> 산성역포레스티아 <span class="year-badge very-young">2020년 (5년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>337건</strong></div>
+                <div class="info-row">📍 경기도 성남시(경) 신흥동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="314" data-rank="5">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 5위</span> 파크리오 <span class="year-badge">2008년 (17년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>314건</strong></div>
+                <div class="info-row">📍 서울특별시 송파구 신천동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="308" data-rank="6">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 6위</span> 고덕그라시움 <span class="year-badge young">2019년 (6년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>308건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 고덕동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="308" data-rank="7">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 7위</span> 광명아크포레자이위브 <span class="year-badge very-young">2021년 (4년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>308건</strong></div>
+                <div class="info-row">📍 경기도 광명시 광명동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="305" data-rank="8">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 8위</span> 인덕원 자이 SK VIEW <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>305건</strong></div>
+                <div class="info-row">📍 경기도 의왕시 내손동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="293" data-rank="9">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 9위</span> 헬리오시티 <span class="year-badge young">2018년 (7년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>293건</strong></div>
+                <div class="info-row">📍 서울특별시 송파구 가락동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="280" data-rank="10">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 10위</span> 고덕아르테온 <span class="year-badge very-young">2020년 (5년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>280건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 상일동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="257" data-rank="11">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 11위</span> 한강 수자인 오브센트 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>257건</strong></div>
+                <div class="info-row">📍 경기도 김포시 북변동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="254" data-rank="12">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 12위</span> 래미안힐스테이트고덕 <span class="year-badge young">2016년 (9년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>254건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 고덕동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="250" data-rank="13">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 13위</span> 선사현대아파트 <span class="year-badge">2000년 (25년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>250건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 암사동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="243" data-rank="14">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 14위</span> 매교역 팰루시드 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>243건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 세류동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="240" data-rank="15">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 15위</span> 센트라스 <span class="year-badge young">2016년 (9년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>240건</strong></div>
+                <div class="info-row">📍 서울특별시 성동구 하왕십리동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="233" data-rank="16">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 16위</span> 이편한세상센트레빌 <span class="year-badge">2010년 (15년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>233건</strong></div>
+                <div class="info-row">📍 경기도 광명시 하안동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="229" data-rank="17">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 17위</span> 롯데캐슬퍼스트 <span class="year-badge">2008년 (17년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>229건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 암사동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="227" data-rank="18">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 18위</span> 평촌자이아이파크 <span class="year-badge very-young">2021년 (4년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>227건</strong></div>
+                <div class="info-row">📍 경기도 안양시(경) 비산동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="217" data-rank="19">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 19위</span> 송도더샵센트럴시티 <span class="year-badge young">2018년 (7년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>217건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="213" data-rank="20">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 20위</span> 리센츠 <span class="year-badge">2008년 (17년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>213건</strong></div>
+                <div class="info-row">📍 서울특별시 송파구 잠실동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="212" data-rank="21">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 21위</span> 황골마을주공1 <span class="year-badge">1997년 (28년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>212건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 영통동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="211" data-rank="22">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 22위</span> 래미안위브 <span class="year-badge">2014년 (11년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>211건</strong></div>
+                <div class="info-row">📍 서울특별시 동대문구 답십리동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="209" data-rank="23">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 23위</span> 광명자이더샵포레나 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>209건</strong></div>
+                <div class="info-row">📍 경기도 광명시 광명동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="208" data-rank="24">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 24위</span> e편한세상송도 <span class="year-badge young">2018년 (7년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>208건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="204" data-rank="25">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 25위</span> 산내마을9단지힐스테이트운정 <span class="year-badge young">2018년 (7년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>204건</strong></div>
+                <div class="info-row">📍 경기도 파주시 목동동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="203" data-rank="26">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 26위</span> 남산타운 <span class="year-badge">2002년 (23년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>203건</strong></div>
+                <div class="info-row">📍 서울특별시 중구(서) 신당동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="199" data-rank="27">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 27위</span> 힐스테이트영통 <span class="year-badge young">2017년 (8년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>199건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 망포동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="199" data-rank="28">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 28위</span> 매교역푸르지오SKVIEW <span class="year-badge very-young">2023년 (2년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>199건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 매교동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="199" data-rank="29">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 29위</span> 인천 SK Sky VIEW <span class="year-badge young">2016년 (9년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>199건</strong></div>
+                <div class="info-row">📍 인천광역시 미추홀구 용현동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="198" data-rank="30">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 30위</span> 잠실엘스 <span class="year-badge">2008년 (17년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>198건</strong></div>
+                <div class="info-row">📍 서울특별시 송파구 잠실동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="198" data-rank="31">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 31위</span> 녹번역e편한세상캐슬 <span class="year-badge very-young">2021년 (4년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>198건</strong></div>
+                <div class="info-row">📍 서울특별시 은평구 응암동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="197" data-rank="32">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 32위</span> 의왕내손e편한세상 <span class="year-badge">2012년 (13년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>197건</strong></div>
+                <div class="info-row">📍 경기도 의왕시 내손동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="195" data-rank="33">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 33위</span> 에스케이북한산시티 <span class="year-badge">2004년 (21년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>195건</strong></div>
+                <div class="info-row">📍 서울특별시 강북구 미아동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="194" data-rank="34">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 34위</span> DMC래미안e편한세상 <span class="year-badge">2012년 (13년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>194건</strong></div>
+                <div class="info-row">📍 서울특별시 서대문구 북가좌동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="193" data-rank="35">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 35위</span> 주은풍림 <span class="year-badge">2002년 (23년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>193건</strong></div>
+                <div class="info-row">📍 경기도 안성시 공도읍 용두리</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="191" data-rank="36">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 36위</span> 매탄위브하늘채 <span class="year-badge">2008년 (17년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>191건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 매탄동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="186" data-rank="37">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 37위</span> 수원역푸르지오자이 <span class="year-badge very-young">2021년 (4년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>186건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 고등동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="184" data-rank="38">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 38위</span> 올림픽훼밀리타운 <span class="year-badge">1988년 (37년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>184건</strong></div>
+                <div class="info-row">📍 서울특별시 송파구 문정동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="184" data-rank="39">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 39위</span> 힐스테이트푸르지오수원 <span class="year-badge very-young">2023년 (2년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>184건</strong></div>
+                <div class="info-row">📍 경기도 수원시(경) 매교동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="gyeonggi" data-count="181" data-rank="40">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 40위</span> 광명 센트럴 아이파크 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>181건</strong></div>
+                <div class="info-row">📍 경기도 광명시 광명동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="180" data-rank="41">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 41위</span> 래미안크레시티 <span class="year-badge">2014년 (11년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>180건</strong></div>
+                <div class="info-row">📍 서울특별시 동대문구 전농동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="179" data-rank="42">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 42위</span> 구월힐스테이트1단지 <span class="year-badge">2007년 (18년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>179건</strong></div>
+                <div class="info-row">📍 인천광역시 남동구 구월동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="167" data-rank="43">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 43위</span> 삼익그린2차 <span class="year-badge">1983년 (42년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>167건</strong></div>
+                <div class="info-row">📍 서울특별시 강동구 명일동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="165" data-rank="44">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 44위</span> 힐스테이트 레이크 송도 5차 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>165건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="seoul" data-count="163" data-rank="45">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 45위</span> 관악드림(동아) <span class="year-badge">2003년 (22년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>163건</strong></div>
+                <div class="info-row">📍 서울특별시 관악구 봉천동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="159" data-rank="46">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 46위</span> 더샵송도마리나베이 <span class="year-badge very-young">2020년 (5년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>159건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="144" data-rank="47">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 47위</span> 주안파크자이더플래티넘 <span class="year-badge very-young">2023년 (2년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>144건</strong></div>
+                <div class="info-row">📍 인천광역시 미추홀구 주안동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="139" data-rank="48">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 48위</span> 힐스테이트푸르지오주안 <span class="year-badge very-young">2023년 (2년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>139건</strong></div>
+                <div class="info-row">📍 인천광역시 미추홀구 주안동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="138" data-rank="49">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 49위</span> 송도자이더스타 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>138건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="136" data-rank="50">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 50위</span> 랜드마크시티센트럴더샵 <span class="year-badge very-young">2020년 (5년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>136건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="135" data-rank="51">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 51위</span> 송도SKVIEW <span class="year-badge young">2019년 (6년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>135건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="128" data-rank="52">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 52위</span> 포레시안 <span class="year-badge">2011년 (14년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>128건</strong></div>
+                <div class="info-row">📍 인천광역시 남동구 만수동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="119" data-rank="53">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 53위</span> 부평두산위브더파크 <span class="year-badge very-young">2022년 (3년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>119건</strong></div>
+                <div class="info-row">📍 인천광역시 부평구 산곡동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="115" data-rank="54">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 54위</span> 래미안 센트리폴(3BL) <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>115건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 옥련동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="113" data-rank="55">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 55위</span> 베르디움더퍼스트 <span class="year-badge young">2017년 (8년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>113건</strong></div>
+                <div class="info-row">📍 인천광역시 연수구 송도동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="113" data-rank="56">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 56위</span> 만수동청울림 <span class="year-badge very-young">2024년 (1년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>113건</strong></div>
+                <div class="info-row">📍 인천광역시 남동구 만수동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="109" data-rank="57">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 57위</span> 부평1,2차금호타운 <span class="year-badge">1998년 (27년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>109건</strong></div>
+                <div class="info-row">📍 인천광역시 부평구 청천동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="108" data-rank="58">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 58위</span> 제일풍경채 계양 위너스카이 A블록 <span class="year-badge new-building">분양</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>108건</strong></div>
+                <div class="info-row">📍 인천광역시 계양구 효성동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="105" data-rank="59">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 59위</span> 부평SKVIEW해모로 <span class="year-badge very-young">2023년 (2년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>105건</strong></div>
+                <div class="info-row">📍 인천광역시 부평구 부평동</div>
+              </div>
+            </div>
+            
+            <div class="card" data-region="incheon" data-count="105" data-rank="60">
+              <div class="card-header ">
+                <h3><span class="rank-number">🏆 60위</span> 삼산타운주공1단지 <span class="year-badge">2005년 (20년차)</span></h3>
+              </div>
+              <div class="divider"></div>
+              <div class="card-body">
+                <div class="info-row">📊 거래량: <strong>105건</strong></div>
+                <div class="info-row">📍 인천광역시 부평구 삼산동</div>
+              </div>
+            </div>
+            
+          </div>
+        </div>
+
+        <script>
+        const regionBtns = document.querySelectorAll('.region-btn');
+        const cards = document.querySelectorAll('.card');
+        const countDisplay = document.getElementById('countDisplay');
+        let currentRegion = 'all';
+
+        function applyFilter() {
+          let visibleCards = [];
+
+          cards.forEach(card => {
+            const cardRegion = card.dataset.region;
+            if(currentRegion === 'all' || cardRegion === currentRegion) {
+              card.style.display = '';
+              visibleCards.push(card);
+            } else {
+              card.style.display = 'none';
+            }
+          });
+
+          // 순위 재계산 및 표시 (상위 20개만)
+          visibleCards.forEach((card, index) => {
+            const rankNumber = card.querySelector('.rank-number');
+            const originalRank = parseInt(card.dataset.rank);
+            const newRank = index + 1;
+
+            // 20위 이후는 숨김
+            if(newRank > 20) {
+              card.style.display = 'none';
+              return;
+            }
+
+            // 순위 이모지 결정
+            let rankEmoji = '🏆';
+            if(newRank === 1) rankEmoji = '🥇';
+            else if(newRank === 2) rankEmoji = '🥈';
+            else if(newRank === 3) rankEmoji = '🥉';
+
+            rankNumber.textContent = `${rankEmoji} ${newRank}위`;
+
+            // 헤더 클래스 변경
+            const header = card.querySelector('.card-header');
+            header.classList.remove('rank-gold', 'rank-silver', 'rank-bronze');
+            if(newRank === 1) header.classList.add('rank-gold');
+            else if(newRank === 2) header.classList.add('rank-silver');
+            else if(newRank === 3) header.classList.add('rank-bronze');
+          });
+
+          // 카운트 표시 업데이트
+          const regionNames = {
+            'all': '전체',
+            'seoul': '서울',
+            'gyeonggi': '경기',
+            'incheon': '인천'
+          };
+          const displayCount = Math.min(visibleCards.length, 20);
+          countDisplay.textContent = `${regionNames[currentRegion]} TOP ${displayCount}`;
+        }
+
+        regionBtns.forEach(btn => {
+          btn.addEventListener('click', () => {
+            regionBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentRegion = btn.dataset.region;
+            applyFilter();
+          });
+        });
+
+        // 초기 카운트 표시
+        applyFilter();
+        </script>
+        </body>
+        </html>
+        

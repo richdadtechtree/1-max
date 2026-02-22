@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>부태리의 부동산 대출계산기</title>
+<style>
+  :root{
+    --bg:#f9f9f9; --card:#fff; --bd:#e5e7eb; --fg:#111; --sub:#555;
+    --pill-bg:#f1f5f9; --pill-bd:#e5e7eb;
+    --ok-bg:#ecfdf5; --ok-bd:#a7f3d0; --ok-fg:#065f46;
+    --warn-bg:#fff7ed; --warn-bd:#fde68a; --warn-fg:#b45309;
+    --err-bg:#fef2f2; --err-bd:#fecaca; --err-fg:#991b1b;
+  }
+
+  /* 스크롤 UX */
+  html{ scroll-behavior:smooth; }
+  body{ overscroll-behavior-y:contain; -webkit-overflow-scrolling:touch; }
+
+  /* 기본 타이포 & 레이아웃 */
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body {
+    font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    max-width: 720px;
+    width: 92%;
+    margin: 0 auto;
+    padding: 22px;              /* 여백 살짝 증가 */
+    line-height: 1.55;
+    word-break: keep-all;
+  }
+  h2 {
+    text-align: center;
+    margin: 8px 0 18px;
+    font-size: clamp(1.1rem, 2.8vw, 1.4rem);
+  }
+  label { font-weight: 700; margin-top: 10px; display: block; }
+  input, select, button {
+    width: 100%; padding: 12px; margin-bottom: 12px; font-size: 1rem; border-radius: 10px;
+    border:1px solid var(--bd); background:#fff; outline:none;
+  }
+  input:focus, select:focus, button:focus { box-shadow: 0 0 0 3px rgba(59,130,246,.18); }
+  input[type="checkbox"], input[type="radio"] { width: auto; margin-right: 8px; }
+  .checkbox-label { display: flex; align-items: center; gap:8px; margin: 6px 0; font-size: 0.98rem; flex-wrap: wrap; }
+
+  .row { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .row-1 { display: grid; grid-template-columns: 1fr; gap: 10px; }
+
+  .box {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    padding: 16px;              /* 내부 여백 증가 */
+    margin: 14px 0 16px;        /* 섹션 간격 증가 → 스크롤 유도 */
+    scroll-margin-top: 14px;    /* 앵커 이동 시 상단 여백 */
+  }
+  .result {
+    background: var(--card);
+    border: 1px solid var(--bd);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+    font-size: clamp(0.92rem, 2.6vw, 0.98rem);
+    line-height: 1.65;
+    overflow-wrap: anywhere;
+  }
+
+  .subtle { font-size: 0.9rem; color: var(--sub); }
+  .hint { font-size: 0.86rem; color:#666; }
+  .hangul { font-size: 0.9rem; color:#555; display:block; margin-top:-6px; margin-bottom:8px; }
+  .section-title { font-weight: 800; margin: 4px 0 10px; font-size: 1.05rem; }
+
+  .caps { display:flex; align-items:center; gap:6px; flex-wrap: wrap; padding-top: 4px; }
+  .pill { display:inline-block; padding:6px 10px; border-radius:999px; background:var(--pill-bg); border:1px solid var(--pill-bd); font-size:12px; margin:2px 4px 2px 0; white-space: nowrap; }
+
+  .ok { color:var(--ok-fg); background:var(--ok-bg); border:1px solid var(--ok-bd); padding:10px; border-radius:8px; }
+  .warn { color:var(--warn-fg); background:var(--warn-bg); border:1px solid var(--warn-bd); padding:10px; border-radius:8px; }
+  .error{ color:var(--err-fg); background:var(--err-bg); border:1px solid var(--err-bd); padding:10px; border-radius:8px; }
+
+  .hide { display:none; }
+  .centered { text-align:center; }
+
+  /* 툴팁 (모바일 넘침 방지) */
+  .tip-wrap{
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+  .tip-trigger{ display:inline-flex; align-items:center; gap:6px; cursor:help; }
+  .tip-trigger .text{ border-bottom: 1px dotted #94a3b8; }
+  .tip-icon{
+    width:20px; height:20px; line-height:20px; text-align:center; font-size:12px; flex:0 0 auto;
+    border-radius:999px; border:1px solid #cbd5e1; background:#f8fafc; color:#334155;
+    cursor:pointer; user-select:none;
+  }
+  .tip-box{
+    position:absolute; left:0; top:calc(100% + 6px);
+    z-index:30; min-width: 240px; max-width: min(86vw, 360px);
+    background:#111827; color:#f9fafb; border:1px solid #374151; border-radius:10px;
+    padding:12px; font-size:0.9rem; box-shadow:0 12px 24px rgba(0,0,0,0.18);
+    opacity:0; visibility:hidden; pointer-events:none; transition:opacity .12s ease;
+    white-space:normal; overflow-wrap:anywhere;
+  }
+  .tip-box b{ color:#bfdbfe; }
+  .tip-box ul{ margin:6px 0 0 16px; padding:0; }
+  .tip-box li{ margin:2px 0; }
+
+  .tip-wrap:hover .tip-box,
+  .tip-wrap:focus-within .tip-box,
+  .tip-wrap.open .tip-box{
+    opacity:1; visibility:visible; pointer-events:auto;
+  }
+
+  /* 모바일 최적화 */
+  @media (max-width: 640px){
+    body{ padding: 18px; }
+    .row{ grid-template-columns: 1fr; gap: 8px; }
+    input, select, button{ padding: 14px; font-size: 1.02rem; }
+    .pill{ white-space: initial; }
+    .tip-box{ left: 0; right: 0; margin-inline: 0; }
+  }
+  @media (max-width: 360px){
+    body{ font-size: 1.02rem; }
+    .result{ font-size: 1rem; }
+  }
+
+  /* 기본 버튼(비-sticky) */
+  .btn-primary{
+    background:#0ea5e9; color:#fff; border: none; font-weight: 800; letter-spacing:.2px;
+    padding: 14px 16px; border-radius: 12px; cursor: pointer; margin-top: 4px;
+  }
+  .btn-primary:active{ transform: translateY(1px); }
+</style>
+</head>
+<body>
+<h2>부태리의 대출계산기</h2>
+
+<div class="box">
+  <div class="section-title">① 기본 입력</div>
+
+  <label>연봉 (만원)</label>
+  <input id="income" type="number" inputmode="numeric" oninput="updateHangulAmount('income')"/>
+  <span id="incomeText" class="hangul"></span>
+
+  <!-- 가격 입력과 한도 요약: 세로 배치 -->
+  <div class="row-1">
+    <div>
+      <label>부동산 가격 (만원)</label>
+      <input id="propertyPrice" type="number" inputmode="numeric" oninput="updateHangulAmount('propertyPrice')"/>
+      <span id="propertyPriceText" class="hangul"></span>
+    </div>
+    <div>
+      <label class="subtle">한도 요약</label>
+      <div id="priceCaps" class="caps"></div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>대출 금리 (연 %, 소수점 가능)</label>
+      <input id="interestRate" type="number" step="0.01" inputmode="decimal"/>
+    </div>
+    <div>
+      <label>상환 기간 (년)</label>
+      <input id="loanTerm" type="number" inputmode="numeric"/>
+    </div>
+  </div>
+
+  <label>기존 대출 월 상환금 (만원)</label>
+  <input id="existingLoanMonthly" type="number" value="0" inputmode="numeric"/>
+</div>
+
+<div class="box">
+  <div class="section-title">② 대출 종류 선택</div>
+  <label class="checkbox-label"><input type="radio" name="loanDomain" value="bank" checked onclick="switchDomain()" /> 금융권 대출</label>
+  <label class="checkbox-label"><input type="radio" name="loanDomain" value="policy" onclick="switchDomain()" /> 정책성 대출(디딤돌/보금자리론)</label>
+</div>
+
+<!-- 금융권 옵션 -->
+<div id="bankPanel" class="box">
+  <div class="section-title">금융권 세부 선택</div>
+  <label class="checkbox-label"><input type="radio" name="bankBorrower" value="general" checked onclick="applyBankPreset()" /> 일반차주</label>
+  <label class="checkbox-label"><input type="radio" name="bankBorrower" value="first" onclick="applyBankPreset()" /> 생애최초</label>
+  <label class="checkbox-label"><input type="radio" name="bankBorrower" value="seomin" onclick="applyBankPreset()" /> 서민·실수요자 <span class="hint">연소득 9천↓, 주택가격 8억↓, 무주택</span></label>
+
+  <div class="row-1">
+    <div>
+      <label>금융권 구분</label>
+      <select id="bankTier" onchange="applyBankPreset()">
+        <option value="tier1">1금융권 (DSR 40%)</option>
+        <option value="tier2">2금융권 (DSR 50%)</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:4px;">
+    <label class="checkbox-label" style="margin-bottom:0;">
+      <input type="checkbox" id="speculativeArea" onchange="applyBankPreset()"/>
+      <span class="tip-wrap" id="tipSpecWrap">
+        <span class="tip-trigger" aria-describedby="tip-spec">
+          <span class="text">투기과열지구</span>
+          <span class="tip-icon" id="tipBtn" role="button" tabindex="0" aria-label="투기과열지구 안내">ℹ︎</span>
+        </span>
+        <div class="tip-box" id="tip-spec" role="tooltip" aria-live="polite">
+          <div><b>투기과열지구 지정(요약)</b></div>
+          <div>✓ (서울) 25개구 전역</div>
+          <div>✓ (경기) 12개 지역</div>
+          <ul>
+            <li>과천시, 광명시</li>
+            <li>수원시 영통구·장안구·팔달구</li>
+            <li>성남시 분당구·수정구·중원구</li>
+            <li>안양시 동안구, 용인시 수지구</li>
+            <li>의왕시, 하남시</li>
+          </ul>
+        </div>
+      </span>
+    </label>
+
+    <label class="checkbox-label" style="margin-bottom:0;">
+      <input type="checkbox" id="capitalArea" onchange="applyBankPreset()"/> 수도권 여부
+      <span class="hint">체크 시 DSR 스트레스 +3%</span>
+    </label>
+  </div>
+
+  <div id="stressAutoInfo" class="ok hide" style="margin:8px 0;">수도권으로 판단되어 DSR 스트레스 금리 <b>+3%</b>가 자동 적용됩니다.</div>
+</div>
+
+<!-- 정책성 옵션 -->
+<div id="policyPanel" class="box hide">
+  <div class="section-title">정책성 대출 선택</div>
+  <label class="checkbox-label"><input type="radio" name="policyType" value="didim" checked onclick="switchPolicy()"/> 디딤돌 대출</label>
+  <label class="checkbox-label"><input type="radio" name="policyType" value="bogum" onclick="switchPolicy()"/> 보금자리론</label>
+
+  <div id="didimPanel" class="box">
+    <div class="section-title">디딤돌 세부</div>
+    <label class="checkbox-label"><input type="radio" name="didimKind" value="normal" checked onclick="updatePriceCaps()"/> 일반(가격 ≤ 5억, 한도 최대 2억)</label>
+    <label class="checkbox-label"><input type="radio" name="didimKind" value="first" onclick="updatePriceCaps()"/> 생애최초(가격 ≤ 5억, 한도 최대 2.4억)</label>
+    <label class="checkbox-label"><input type="radio" name="didimKind" value="newlyweds" onclick="updatePriceCaps()"/> 신혼·2자녀(가격 ≤ <b>6억</b>, 한도 최대 3.2억)</label>
+    <label class="checkbox-label"><input type="radio" name="didimKind" value="newborn" onclick="updatePriceCaps()"/> 신생아(가격 ≤ 5억, 한도 최대 4억)</label>
+
+    <div class="row">
+      <div>
+        <label>부부합산 연소득 (만원)</label>
+        <input id="didimIncome" type="number" placeholder="예: 6000" inputmode="numeric"/>
+      </div>
+      <div>
+        <label>합산 순자산 가액 (만원)</label>
+        <input id="didimAsset" type="number" placeholder="예: 48800" inputmode="numeric"/>
+      </div>
+    </div>
+    <label class="checkbox-label"><input type="checkbox" id="didimNoHouse"/> 무주택 세대주</label>
+    <div class="subtle">자격 핵심: 가격 ≤5억(신혼·2자녀 ≤6억), 소득 한도, 순자산 ≤4.88억</div>
+  </div>
+
+  <div id="bogumPanel" class="box hide">
+    <div class="section-title">보금자리론 세부</div>
+    <label class="checkbox-label"><input type="radio" name="bogumKind" value="normal" checked onclick="updatePriceCaps()"/> 일반(가격 ≤ 6억, 한도 최대 3.6억)</label>
+    <label class="checkbox-label"><input type="radio" name="bogumKind" value="first" onclick="updatePriceCaps()"/> 생애최초(가격 ≤ 6억, 한도 최대 4.2억)</label>
+    <div class="row">
+      <div>
+        <label>부부합산 연소득 (만원)</label>
+        <input id="bogumIncome" type="number" placeholder="예: 7000" inputmode="numeric"/>
+      </div>
+      <div>
+        <label>비(非)아파트 여부</label>
+        <select id="bogumNonApt" onchange="switchPolicy()">
+          <option value="no" selected>아파트(최대 LTV 60%)</option>
+          <option value="yes">비아파트(최대 LTV 55%)</option>
+        </select>
+      </div>
+    </div>
+    <label class="checkbox-label"><input type="checkbox" id="bogumNoHouse"/> 무주택 또는 1주택(요건)</label>
+    <div class="subtle">자격 핵심: 가격 ≤6억, 소득 ≤7천, LTV 60%(비아파트 55%), DTI 50%, DSR 없음</div>
+  </div>
+</div>
+
+<div class="box">
+  <div class="section-title">③ 상환 방식</div>
+  <label class="checkbox-label"><input type="radio" name="repaymentType" value="equalPrincipalInterest" checked/> 원리금 균등</label>
+  <label class="checkbox-label"><input type="radio" name="repaymentType" value="equalPrincipal"/> 원금 균등</label>
+</div>
+
+<div class="box">
+  <div class="section-title">④ 수동 비율 조정 (자동값을 기본 세팅, 필요 시 수정)</div>
+  <div class="row">
+    <div><label>LTV 비율 (%)</label><input id="ltvInput" type="number" step="0.1" value="70" inputmode="decimal"/></div>
+    <div><label>DTI 비율 (%)</label><input id="dtiInput" type="number" step="0.1" value="60" inputmode="decimal"/></div>
+  </div>
+  <div class="row">
+    <div><label>DSR 비율 (%)</label><input id="dsrInput" type="number" step="0.1" value="40" inputmode="decimal"/></div>
+    <div><label>출처/메모</label><input id="sourceNote" type="text" placeholder="정책 출처/메모 입력(선택)"/></div>
+  </div>
+  <div class="subtle">※ ‘수도권 여부’ 체크 시 <b>DSR 스트레스 금리 +3%</b> 자동 반영.</div>
+</div>
+
+<!-- ✅ 일반 흐름 버튼 (sticky 제거) -->
+<button class="btn-primary" onclick="calculateLoan()">계산하기</button>
+
+<div id="eligibility" class="result hide"></div>
+<div id="result" class="result"></div>
+
+<footer class="centered" style="margin:18px 0 8px">
+  <p>협업 및 수정 문의</p>
+  <p><a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">https://litt.ly/richdadtechtree</a></p>
+</footer>
+
+<script>
+  /* ---------- 한글 금액 표기 ---------- */
+  function numberToKorean(num) {
+    const units = ["", "만", "억", "조", "경"];
+    const digits = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"];
+    const smallUnits = ["", "십", "백", "천"];
+    num = num * 10000;
+    if (!num || num === 0) return "영";
+    const splitUnits = [];
+    while (num > 0) { splitUnits.push(num % 10000); num = Math.floor(num / 10000); }
+    const result = splitUnits.map((chunk, idx) => {
+      if (chunk === 0) return '';
+      let chunkStr = '';
+      const str = chunk.toString().padStart(4, '0');
+      const nums = str.split('').map(Number);
+      nums.forEach((n, i) => {
+        if (n === 0) return;
+        const unit = smallUnits[3 - i];
+        if (n === 1 && unit !== '') chunkStr += unit;
+        else chunkStr += digits[n] + unit;
+      });
+      return chunkStr + units[idx];
+    });
+    return result.reverse().join('');
+  }
+  function updateHangulAmount(fieldId) {
+    const v = parseInt(document.getElementById(fieldId).value);
+    document.getElementById(fieldId + 'Text').innerText = isNaN(v) ? '' : '→ ' + numberToKorean(v) + '원';
+  }
+
+  /* === 정책성 대출: 연봉 → 부부합산 연소득 자동 동기화 === */
+  let didimIncomeEdited = false;
+  let bogumIncomeEdited = false;
+
+  function syncPolicyIncome(force = false) {
+    const domain = document.querySelector('input[name="loanDomain"]:checked')?.value;
+    if (domain !== 'policy') return;
+
+    const incomeVal = document.getElementById('income')?.value ?? '';
+    const didimEl = document.getElementById('didimIncome');
+    const bogumEl = document.getElementById('bogumIncome');
+
+    if (didimEl) { if (force || !didimIncomeEdited) didimEl.value = incomeVal; }
+    if (bogumEl) { if (force || !bogumIncomeEdited) bogumEl.value = incomeVal; }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const didimEl = document.getElementById('didimIncome');
+    const bogumEl = document.getElementById('bogumIncome');
+    if (didimEl) didimEl.addEventListener('input', () => { didimIncomeEdited = true; });
+    if (bogumEl) bogumEl.addEventListener('input', () => { bogumIncomeEdited = true; });
+
+    const incomeEl = document.getElementById('income');
+    if (incomeEl) incomeEl.addEventListener('input', () => { syncPolicyIncome(false); });
+  });
+
+  /* ---------- UI 스위치 ---------- */
+  function switchDomain() {
+    const domain = document.querySelector('input[name="loanDomain"]:checked').value;
+    document.getElementById('bankPanel').classList.toggle('hide', domain !== 'bank');
+    document.getElementById('policyPanel').classList.toggle('hide', domain !== 'policy');
+    if (domain === 'bank') applyBankPreset();
+    if (domain === 'policy') switchPolicy();
+    updatePriceCaps();
+    if (domain === 'policy') syncPolicyIncome(true);
+  }
+
+  function switchPolicy() {
+    const p = document.querySelector('input[name="policyType"]:checked').value;
+    document.getElementById('didimPanel').classList.toggle('hide', p !== 'didim');
+    document.getElementById('bogumPanel').classList.toggle('hide', p !== 'bogum');
+    if (p === 'didim') { document.getElementById('ltvInput').value = 70; document.getElementById('dtiInput').value = 60; document.getElementById('dsrInput').value = 0; }
+    if (p === 'bogum') {
+      const non = document.getElementById('bogumNonApt').value === 'yes';
+      document.getElementById('ltvInput').value = non ? 55 : 60;
+      document.getElementById('dtiInput').value = 50;
+      document.getElementById('dsrInput').value = 0;
+    }
+    updatePriceCaps();
+    syncPolicyIncome(true);
+  }
+
+  /* ---------- 금융권 규칙 프리셋 ---------- */
+  function applyBankPreset() {
+    const borrower = document.querySelector('input[name="bankBorrower"]:checked').value; // general | first | seomin
+    const isSpec   = document.getElementById('speculativeArea').checked;                // 투기과열지구
+    const isCapital= document.getElementById('capitalArea').checked;                    // 수도권
+    const tier     = document.getElementById('bankTier').value;                         // tier1 | tier2
+
+    let ltv = 70, dti = 60, dsr = (tier === 'tier2' ? 50 : 40);
+
+    if (borrower === 'first') {
+      ltv = 70; dti = 60;
+    } else if (borrower === 'seomin') {
+      if (isSpec) { ltv = 60; dti = 60; }
+      else { ltv = 70; dti = 60; }
+    } else {
+      if (isSpec) { ltv = 40; dti = 40; }
+      else { ltv = 70; dti = 60; }
+    }
+
+    document.getElementById('ltvInput').value = ltv;
+    document.getElementById('dtiInput').value = dti;
+    document.getElementById('dsrInput').value = dsr;
+
+    document.getElementById('stressAutoInfo').classList.toggle('hide', !isCapital);
+    updatePriceCaps();
+  }
+
+  /* ---------- 부동산 가격 한도 배지 업데이트 ---------- */
+  function updatePriceCaps() {
+    const capsEl = document.getElementById('priceCaps');
+    const domain = document.querySelector('input[name="loanDomain"]:checked').value;
+
+    const seominCap = '서민·실수요자 ≤ 8억';
+    let didimCap = '디딤돌 ≤ 5억';
+    const didimKind = document.querySelector('input[name="didimKind"]:checked');
+    if (didimKind && didimKind.value === 'newlyweds') didimCap = '디딤돌(신혼·2자녀) ≤ 6억';
+    const bogumCap = '보금자리론 ≤ 6억';
+
+    const borrower = document.querySelector('input[name="bankBorrower"]:checked')?.value || '';
+    const isBankSeomin = (domain === 'bank' && borrower === 'seomin');
+    const isPolicyDidim = (domain === 'policy' && document.querySelector('input[name="policyType"]:checked')?.value === 'didim');
+    const isPolicyBogum = (domain === 'policy' && document.querySelector('input[name="policyType"]:checked')?.value === 'bogum');
+
+    capsEl.innerHTML = `
+      <span class="pill" style="${isBankSeomin ? 'font-weight:700;' : ''}">금융권-서민·실수요자: ${seominCap}</span>
+      <span class="pill" style="${isPolicyDidim ? 'font-weight:700;' : ''}">${didimCap}</span>
+      <span class="pill" style="${isPolicyBogum ? 'font-weight:700;' : ''}">${bogumCap}</span>
+    `;
+  }
+
+  /* ---------- 계산 ---------- */
+  function convertToEok(amount) { return (amount / 10000).toFixed(2); }
+
+  function calculateLoan() {
+    const income = parseFloat(document.getElementById('income').value);
+    const propertyPrice = parseFloat(document.getElementById('propertyPrice').value);
+    const existingLoanMonthly = parseFloat(document.getElementById('existingLoanMonthly').value) || 0;
+    const originalInterestRate = parseFloat(document.getElementById('interestRate').value) / 100;
+    const loanTerm = parseInt(document.getElementById('loanTerm').value);
+
+    let ltv = parseFloat(document.getElementById('ltvInput').value) / 100;
+    let dti = parseFloat(document.getElementById('dtiInput').value) / 100;
+    let dsr = parseFloat(document.getElementById('dsrInput').value) / 100;
+
+    const domain = document.querySelector('input[name="loanDomain"]:checked').value;
+    const repaymentType = document.querySelector('input[name="repaymentType"]:checked').value;
+
+    if ([income, propertyPrice, originalInterestRate, loanTerm, ltv, dti, dsr].some(x => isNaN(x))) {
+      document.getElementById('eligibility').classList.add('hide');
+      document.getElementById('result').innerHTML = '<div class="error">모든 필수 값을 정확히 입력해주세요.</div>';
+      return;
+    }
+
+    let stressInterestRate = originalInterestRate;
+    const isCapital = document.getElementById('capitalArea').checked;
+    if (domain === 'bank' && isCapital) stressInterestRate += 0.03; // 수도권 자동 +3%
+
+    const months = loanTerm * 12;
+
+    // LTV 한도
+    const ltvLimit = propertyPrice * ltv;
+
+    // DTI 한도
+    const monthlyInterestRate = originalInterestRate / 12;
+    const annuityFactor = monthlyInterestRate === 0
+      ? 1 / months
+      : (monthlyInterestRate * Math.pow(1 + monthlyInterestRate, months)) / (Math.pow(1 + monthlyInterestRate, months) - 1);
+    const yearlyRepaymentPerLoan = annuityFactor * 12;
+    const dtiLimit = (income * dti) / yearlyRepaymentPerLoan;
+
+    // DSR 한도
+    const stressMonthly = stressInterestRate / 12;
+    const noStressMonthly = originalInterestRate / 12;
+
+    const maxDSRMonthly = (income * dsr) / 12;
+    const availableMonthlyDSR = maxDSRMonthly - existingLoanMonthly;
+
+    let dsrLimit = Infinity;
+    let dsrLimitNoStress = Infinity;
+
+    if (dsr > 0) {
+      if (availableMonthlyDSR > 0) {
+        dsrLimit = (stressMonthly === 0)
+          ? availableMonthlyDSR * months
+          : availableMonthlyDSR * (1 - Math.pow(1 + stressMonthly, -months)) / stressMonthly;
+        dsrLimitNoStress = (noStressMonthly === 0)
+          ? availableMonthlyDSR * months
+          : availableMonthlyDSR * (1 - Math.pow(1 + noStressMonthly, -months)) / noStressMonthly;
+      } else {
+        dsrLimit = 0;
+        dsrLimitNoStress = 0;
+      }
+    }
+
+    let limits = [
+      { type: "LTV", amount: ltvLimit },
+      { type: "DTI", amount: dtiLimit },
+      { type: "DSR", amount: dsrLimit }
+    ];
+
+    // 금융권 가격 구간 한도
+    if (domain === 'bank') {
+      if (propertyPrice > 150000 && propertyPrice <= 250000) {
+        limits.push({ type: "가격구간 정책한도(15~25억: 4억)", amount: 40000 });
+      } else if (propertyPrice > 250000) {
+        limits.push({ type: "가격구간 정책한도(25억초과: 2억)", amount: 20000 });
+      }
+    }
+
+    // 자격 경고
+    const eligDiv = document.getElementById('eligibility');
+    eligDiv.classList.add('hide');
+    eligDiv.innerHTML = '';
+
+    if (domain === 'bank') {
+      const borrower = document.querySelector('input[name="bankBorrower"]:checked').value;
+      if (borrower === 'seomin' && propertyPrice > 80000) {
+        eligDiv.classList.remove('hide');
+        eligDiv.innerHTML = `<div class="warn"><b>자격확인 필요</b><br>• 서민·실수요자: 주택가격 <b>8억원 이하</b> 요건 위반</div>`;
+      }
+    }
+
+    // 정책성: 자격검증 + 상품한도
+    if (domain === 'policy') {
+      const p = document.querySelector('input[name="policyType"]:checked').value;
+
+      if (p === 'didim') {
+        const kind = document.querySelector('input[name="didimKind"]:checked').value;
+        const didimIncome = parseFloat(document.getElementById('didimIncome').value || '0');
+        const didimAsset = parseFloat(document.getElementById('didimAsset').value || '0');
+        const didimNoHouse = document.getElementById('didimNoHouse').checked;
+
+        const reasons = [];
+        const priceOk = (kind === 'newlyweds') ? (propertyPrice <= 60000) : (propertyPrice <= 50000);
+        if (!priceOk) reasons.push('디딤돌 가격 요건 위반 (기본 ≤5억, 신혼·2자녀 ≤6억)');
+        let incCap = 6000;
+        if (kind === 'first' || kind === 'newlyweds') incCap = 7000;
+        if (kind === 'newlyweds') incCap = 8500;
+        if (didimIncome <= 0 || didimIncome > incCap) reasons.push(`소득 요건 (≤${incCap}만원) 위반`);
+        if (!didimNoHouse) reasons.push('무주택 세대주 요건 필요');
+        if (didimAsset <= 0 || didimAsset > 48800) reasons.push('합산 순자산 > 4.88억원');
+
+        if (reasons.length) {
+          eligDiv.classList.remove('hide');
+          eligDiv.innerHTML = `<div class="warn"><b>자격확인 필요</b><br>• ${reasons.join('<br>• ')}</div>`;
+        }
+
+        let prodCap = 20000;
+        if (kind === 'first') prodCap = 24000;
+        if (kind === 'newlyweds') prodCap = 32000;
+        if (kind === 'newborn') prodCap = 40000;
+        limits.push({ type: "상품한도(디딤돌)", amount: prodCap });
+
+      } else if (p === 'bogum') {
+        const kind = document.querySelector('input[name="bogumKind"]:checked').value;
+        const bogumIncome = parseFloat(document.getElementById('bogumIncome').value || '0');
+        const nonApt = document.getElementById('bogumNonApt').value === 'yes';
+        const bogumNoHouse = document.getElementById('bogumNoHouse').checked;
+
+        const reasons = [];
+        if (propertyPrice > 60000) reasons.push('보금자리론 가격 요건 위반 (≤6억)');
+        if (bogumIncome <= 0 || bogumIncome > 7000) reasons.push('소득 요건 (≤7천만원) 위반');
+        if (!bogumNoHouse) reasons.push('무주택(또는 1주택 요건) 확인 필요');
+
+        if (reasons.length) {
+          eligDiv.classList.remove('hide');
+          eligDiv.innerHTML = `<div class="warn"><b>자격확인 필요</b><br>• ${reasons.join('<br>• ')}</div>`;
+        }
+
+        let prodCap = (kind === 'first') ? 42000 : 36000;
+        limits.push({ type: "상품한도(보금자리론)", amount: prodCap });
+      }
+    }
+
+    // 최종 한도
+    const minLoan = limits.reduce((m, c) => (c.amount < m.amount ? c : m), limits[0]);
+    const finalLoan = minLoan.amount;
+    const reason = minLoan.type;
+
+    // 월 상환액 계산
+    const r = originalInterestRate / 12;
+    const N = months;
+    let monthlyPayment, monthlyPrincipal, monthlyInterest;
+    if (repaymentType === "equalPrincipalInterest") {
+      monthlyPayment = (r === 0) ? finalLoan / N : finalLoan * r / (1 - Math.pow(1 + r, -N));
+      monthlyPrincipal = finalLoan / N;
+      monthlyInterest = monthlyPayment - monthlyPrincipal;
+    } else {
+      monthlyPrincipal = finalLoan / N;
+      monthlyInterest = finalLoan * r; // 첫달 이자
+      monthlyPayment = monthlyPrincipal + monthlyInterest;
+    }
+
+    const avgMonthlyIncome = income / 12;
+    const monthlyGap = avgMonthlyIncome - monthlyPayment;
+    const repaymentRatio = (monthlyPayment / avgMonthlyIncome) * 100;
+
+    // 스트레스 라인 (수도권 +3%일 때만 표시)
+    let stressLine = '';
+    if (domain === 'bank' && isCapital) {
+      stressLine = `<div class="pill">DSR 스트레스 금리: ${(stressInterestRate*100).toFixed(2)}% (수도권 자동 +3%)</div>`;
+    }
+
+    const dsrLine = (dsr === 0)
+      ? '비적용'
+      : `${convertToEok(dsrLimit)}억원${(domain === 'bank' && isCapital) ? ` <span class="subtle">(스트레스 미적용시 ${convertToEok(dsrLimitNoStress)}억원)</span>` : ''}`;
+
+    let limitsHtml =
+      `<strong>LTV 한도:</strong> ${convertToEok(ltvLimit)}억원<br>` +
+      `<strong>DTI 한도:</strong> ${convertToEok(dtiLimit)}억원<br>` +
+      `<strong>DSR 한도:</strong> ${dsrLine}<br>`;
+
+    limits.filter(x => x.type.includes('정책한도') || x.type.includes('상품한도'))
+      .forEach(x => { limitsHtml += `<strong>${x.type}:</strong> ${convertToEok(x.amount)}억원<br>`; });
+
+    document.getElementById('result').innerHTML =
+      `${limitsHtml}
+       ${stressLine}
+       <hr>
+       💡 <strong>최종 대출 한도는 <u>${reason}</u> 기준으로 <u>${convertToEok(finalLoan)}억원</u>입니다.</strong><br><br>
+       <strong>월 상환금:</strong> ${Math.floor(monthlyPayment)}만원 (${repaymentType === "equalPrincipalInterest" ? "원리금 균등" : "원금 균등(첫달)"})<br>
+       - 월 원금: <strong>${Math.floor(monthlyPrincipal)}만원</strong><br>
+       - 월 이자: <strong>${Math.floor(monthlyInterest)}만원</strong><br>
+       <hr><strong>📊 월 소득 분석</strong><br>
+       - 평균 월급: <strong>${Math.floor(avgMonthlyIncome)}만원</strong><br>
+       - 월 상환 후 남는 금액: <strong>${Math.floor(monthlyGap)}만원</strong><br>
+       - 상환 비율: <strong>${repaymentRatio.toFixed(1)}%</strong>`;
+  }
+
+  /* === 툴팁: 모바일/데스크탑 공통 토글 === */
+  (function tooltipInit(){
+    const wrap = document.getElementById('tipSpecWrap');
+    const btn  = document.getElementById('tipBtn');
+    if (!wrap || !btn) return;
+
+    const toggle = (force) => {
+      const willOpen = (typeof force === 'boolean') ? force : !wrap.classList.contains('open');
+      wrap.classList.toggle('open', willOpen);
+      btn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    };
+    btn.addEventListener('click', (e)=>{ e.stopPropagation(); toggle(); });
+    btn.addEventListener('keydown', (e)=>{
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }
+    });
+
+    document.addEventListener('click', (e)=>{
+      if (!wrap.contains(e.target)) toggle(false);
+    });
+
+    window.addEventListener('scroll', ()=> toggle(false), { passive:true });
+    window.addEventListener('resize', ()=> toggle(false));
+  })();
+
+  // 초기 세팅
+  switchDomain();
+</script>
+</body>
+</html>

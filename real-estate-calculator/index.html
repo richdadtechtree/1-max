@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>부태리 계산기 허브 – 7개 탭</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-75SPDY6N8V"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-75SPDY6N8V');
+  </script>
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#151822; --text:#e8eaf0; --muted:#96a0b5;
+      --accent:#4caf50; --accent-weak:#3a8f40; --tab:rgba(255,255,255,.06);
+      --tab-active:linear-gradient(180deg, rgba(76,175,80,.18), rgba(76,175,80,.06));
+      --ring:rgba(76,175,80,.35);
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",Arial,sans-serif;
+      background:linear-gradient(180deg,#0b0c10 0%,#0f1220 100%); color:var(--text);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    header{position:sticky; top:0; z-index:10; backdrop-filter:saturate(150%) blur(8px); background:rgba(11,12,16,.6); border-bottom:1px solid rgba(255,255,255,.06)}
+    .wrap{max-width:1080px; margin:0 auto; padding:18px 16px}
+    h1{margin:0; font-size:clamp(20px, 2.8vw, 28px); letter-spacing:-.2px}
+    .sub{color:var(--muted); font-size:13px}
+
+    .header-top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px}
+
+    .tabs{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px}
+    [role="tab"]{
+      appearance:none; border:1px solid rgba(255,255,255,.06); background:var(--tab); color:var(--text);
+      padding:10px 14px; border-radius:999px; font-weight:700; font-size:14px; cursor:pointer; transition:all .18s ease
+    }
+    [role="tab"].active{background:var(--tab-active); border-color:var(--accent-weak); box-shadow:0 0 0 3px var(--ring) inset}
+    [role="tab"]:hover{transform:translateY(-1px)}
+
+    .panel{
+      margin:18px auto 28px; background:var(--card); border:1px solid rgba(255,255,255,.06);
+      border-radius:18px; padding:10px; overflow:hidden
+    }
+    .panel[hidden]{display:none}
+    iframe{width:100%; border:0; border-radius:12px; background:#fff; min-height:1200px}
+
+    footer.page{border-top:1px solid rgba(255,255,255,.06); text-align:center; color:var(--muted); font-size:13px; padding:28px 0 36px}
+    footer.page a{color:#cfe6ff; text-decoration:none}
+
+
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="header-top">
+        <div>
+          <h1>부태리 계산기 허브</h1>
+          <div class="sub">내 투자/대출/경비 계산 도구를 한 곳에서</div>
+        </div>
+      </div>
+
+      <div class="tabs" role="tablist" aria-label="계산기 선택">
+        <button id="tab-roi" class="active" role="tab" aria-selected="true" aria-controls="panel-roi">실전 수익률 계산기</button>
+        <button id="tab-invest-loan" role="tab" aria-selected="false" aria-controls="panel-invest-loan">내 자산 + 연봉에 맞는 금액대</button>
+        <button id="tab-cost" role="tab" aria-selected="false" aria-controls="panel-cost">부동산 매수 경비 계산기</button>
+        <button id="tab-loan" role="tab" aria-selected="false" aria-controls="panel-loan">부동산 대출 계산기 </button>
+        <button id="tab-map" role="tab" aria-selected="false" aria-controls="panel-map">LTV+급여 투자맵</button>
+      </div>
+      <div class="help">💡 팁: 각 탭을 클릭하거나 주소 뒤에 <code>#roi</code>, <code>#invest-loan</code>, <code>#cost</code>, <code>#loan</code>, <code>#map</code>을 붙이면 바로 열 수 있어요.</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Panel 0: 수익률 계산기 -->
+    <section id="panel-roi" class="panel" role="tabpanel" aria-labelledby="tab-roi">
+      <iframe title="실전 수익률 계산기" data-file="수익률계산기.html?v=2" loading="eager"></iframe>
+    </section>
+
+    <!-- Panel 1 -->
+    <section id="panel-invest-loan" class="panel" role="tabpanel" aria-labelledby="tab-invest-loan" hidden>
+      <iframe title="내 자산 + 연봉에 맞는 금액대" data-file="투자 가능 단지 찾기(대출계산기) r6.html" loading="lazy"></iframe>
+    </section>
+
+    <!-- Panel 2 -->
+    <section id="panel-cost" class="panel" role="tabpanel" aria-labelledby="tab-cost" hidden>
+      <iframe title="부동산 매수 경비 계산기" data-file="1. 부동산 매수 경비 산출 계산기 -r2.html" loading="lazy"></iframe>
+    </section>
+
+    <!-- Panel 3 -->
+    <section id="panel-loan" class="panel" role="tabpanel" aria-labelledby="tab-loan" hidden>
+      <iframe title="부동산 대출 계산기" data-file="20250413대출계산기-r5.html" loading="lazy"></iframe>
+    </section>
+
+    <!-- Panel 4 -->
+    <section id="panel-map" class="panel" role="tabpanel" aria-labelledby="tab-map" hidden>
+      <iframe title="LTV+급여 투자맵" data-file="LTV+급여로 본 투자맵.html" loading="lazy"></iframe>
+    </section>
+
+    <footer class="page">
+      <div><strong>협업 및 수정 문의</strong> · <a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">https://litt.ly/richdadtechtree</a></div>
+    </footer>
+  </main>
+
+
+  <script>
+    (function(){
+      /* ====== 탭 ====== */
+      const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+
+      function encodeSrc(iframe){
+        if (iframe && !iframe.dataset.loaded) {
+          try { iframe.src = encodeURI(iframe.dataset.file); } catch (e) { iframe.src = iframe.dataset.file; }
+          iframe.dataset.loaded = 'true';
+        }
+      }
+      function resizeIframe(iframe){
+        try {
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          if (!doc) return;
+          const setHeight = () => {
+            const body = doc.body, html = doc.documentElement;
+            const h = Math.max(
+              body.scrollHeight, body.offsetHeight,
+              html.clientHeight, html.scrollHeight, html.offsetHeight
+            );
+            iframe.style.minHeight = Math.max(900, h + 24) + 'px';
+          };
+          new MutationObserver(setHeight).observe(doc.documentElement, { childList:true, subtree:true, attributes:true });
+          iframe.contentWindow.addEventListener('load', setHeight);
+          window.addEventListener('resize', setHeight);
+        } catch (e) { /* 교차 출처면 고정 높이 */ }
+      }
+      function activateTab(tab){
+        tabs.forEach(t => {
+          t.classList.remove('active');
+          t.setAttribute('aria-selected','false');
+          const p = document.getElementById(t.getAttribute('aria-controls'));
+          if (p) p.hidden = true;
+        });
+        tab.classList.add('active');
+        tab.setAttribute('aria-selected','true');
+        const panel = document.getElementById(tab.getAttribute('aria-controls'));
+        if (panel) {
+          panel.hidden = false;
+          const iframe = panel.querySelector('iframe');
+          encodeSrc(iframe);
+          resizeIframe(iframe);
+        }
+        history.replaceState(null, '', '#' + tab.id.replace('tab','').replace(/^-/,''));
+      }
+      tabs.forEach(t => t.addEventListener('click', () => activateTab(t)));
+      const hash = location.hash.replace('#','');
+      const initial = hash ? document.getElementById('tab-' + hash) : tabs[0];
+      activateTab(initial || tabs[0]);
+      document.addEventListener('keydown', e => {
+        if (!['ArrowLeft','ArrowRight'].includes(e.key)) return;
+        const idx = tabs.findIndex(t => t.classList.contains('active'));
+        const next = e.key === 'ArrowRight' ? (idx + 1) % tabs.length : (idx - 1 + tabs.length) % tabs.length;
+        activateTab(tabs[next]);
+      });
+
+    })();
+  </script>
+</body>
+</html>

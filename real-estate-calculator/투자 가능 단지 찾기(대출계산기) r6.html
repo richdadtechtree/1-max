@@ -1,0 +1,703 @@
+
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover" />
+  <title>부태리의 연봉+자산 기준 투자단지 찾기</title>
+  <style>
+    :root{
+      --bg:#f8fafc;
+      --card:#ffffff;
+      --border:#e5e7eb;
+      --text:#111827;
+      --sub:#6b7280;
+      --brand:#4f46e5;
+      --brand-50:#eef2ff;
+      --brand-200:#c7d2fe;
+      --ok-bg:#ecfdf5;
+      --ok-bd:#a7f3d0;
+      --warn-bg:#fff7ed;
+      --warn-bd:#fde68a;
+      --err-bg:#fee2e2;
+      --err-bd:#fecaca;
+      --yellow:#FEF08A;
+      --shadow:0 2px 8px rgba(0,0,0,.06);
+      --radius:12px;
+    }
+
+    /* ✅ 부드러운 스크롤 UX */
+    html{ scroll-behavior:smooth; }
+    html,body{height:100%;}
+    body{
+      overscroll-behavior-y:contain;
+      -webkit-overflow-scrolling:touch;
+
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", Arial, sans-serif;
+      color:var(--text);
+      background:var(--bg);
+      max-width: 760px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 18px; /* 살짝 증가 */
+      box-sizing: border-box;
+      -webkit-font-smoothing: antialiased;
+      -webkit-tap-highlight-color: transparent;
+      line-height: 1.55;
+    }
+
+    h2{ text-align:center; margin: 8px 0 18px; font-weight:800; }
+    label{ font-weight: 700; margin-top: 10px; display:block; }
+    input, select, button{
+      width: 100%;
+      padding: 14px 12px;
+      margin-bottom: 12px;
+      font-size: 1rem;
+      box-sizing: border-box;
+      border:1px solid var(--border);
+      border-radius: 10px;
+      background: #fff;
+      outline: none;
+    }
+    input:focus, select:focus, button:focus{ box-shadow: 0 0 0 3px rgba(79,70,229,.18); }
+    input[type="checkbox"], input[type="radio"]{ width:auto; margin-right: 6px; }
+    .checkbox-label{ display:flex; align-items:center; gap:8px; margin:6px 0; font-size:0.97rem; flex-wrap: wrap; }
+
+    .row{ display:grid; grid-template-columns: 1fr 1fr; gap:10px; }
+    .row-1{ display:grid; grid-template-columns: 1fr; gap:10px; }
+
+    .box{
+      position: relative;       /* 섹션 그라데이션 고정용 */
+      background:var(--card);
+      border-radius: var(--radius);
+      padding: 16px;            /* ↑ */
+      margin: 14px 0 18px;      /* ↑ 섹션 간격 */
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      scroll-margin-top: 14px;  /* 앵커 이동 시 상단 여백 */
+      overflow: visible;
+    }
+
+    /* ✅ 섹션 하단 그라데이션 + 화살표 (기본 숨김, JS로 토글) */
+    .section-fade{
+      position:absolute;
+      left:-1px; right:-1px; bottom:-1px;
+      height:40px;
+      background: linear-gradient(to top, var(--card) 70%, rgba(255,255,255,0));
+      pointer-events:none;
+      display:none;
+      border-bottom-left-radius: var(--radius);
+      border-bottom-right-radius: var(--radius);
+    }
+    .section-fade svg{
+      position:absolute;
+      left:50%; transform:translateX(-50%);
+      bottom:6px;
+      width:20px; height:20px; opacity:.45;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.15));
+    }
+    .section-fade.show{ display:block; }
+
+    .result{
+      background:var(--card);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-top: 16px;
+      font-size: 0.98rem;
+      line-height: 1.65;
+      border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      overflow-wrap:anywhere;
+    }
+    .subtle{ font-size: 0.92rem; color: var(--sub); }
+    .hangul{ font-size: 0.92rem; color: var(--sub); display:block; margin-top:-6px; margin-bottom:8px; }
+    .pill{ display:inline-block; padding:6px 10px; border-radius:999px; background:#f1f5f9; border:1px solid #e5e7eb; font-size:12px; margin:2px 6px 2px 0; white-space:nowrap; }
+    .ok{ color:#065f46; background:var(--ok-bg); border:1px solid var(--ok-bd); padding:10px; border-radius:8px; }
+    .warn{ color:#b45309; background:var(--warn-bg); border:1px solid var(--warn-bd); padding:10px; border-radius:8px; }
+    .error{ color:#991b1b; background:var(--err-bg); border:1px solid var(--err-bd); padding:10px; border-radius:8px; }
+    .section-title{ font-weight: 800; margin:14px 0 8px; font-size:1.05rem; }
+    .calculation-steps{ background:#f3f4f6; border-left:4px solid #10b981; padding:12px; margin:15px 0; font-size:0.94rem; border-radius: 0 10px 10px 0; }
+    .hide{ display:none; }
+    footer{ margin: 28px 0 18px; text-align:center; font-size:0.9rem; color:#555; }
+    footer a{ color:#374151; text-decoration:none; font-weight:700; }
+
+    /* ✅ 강조 박스 */
+    .highlight-card{
+      background:var(--brand-50);
+      border:1px solid var(--brand-200);
+      border-left:6px solid var(--brand);
+      border-radius:14px;
+      padding:16px 16px;
+      box-shadow: var(--shadow);
+      margin:12px 0 14px;
+    }
+    .highlight-primary{
+      font-weight:800;
+      font-size:1.08rem;
+      line-height:1.5;
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      align-items:center;
+    }
+    .highlight-primary .amount{
+      display:inline-block;
+      font-size:1.9rem;
+      font-weight:900;
+      background:var(--yellow);
+      padding:3px 8px;
+      border-radius:8px;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.06);
+      line-height:1.2;
+    }
+    .elig-badge{
+      display:inline-block;
+      padding:4px 10px;
+      font-weight:900;
+      font-size:0.92rem;
+      color:#991b1b;
+      background:#fee2e2;
+      border:1px solid #fecaca;
+      border-radius:999px;
+      vertical-align:middle;
+    }
+    .highlight-secondary{
+      margin-top:8px;
+      font-size:1.06rem;
+      color:#111827;
+      font-weight:700;
+    }
+
+    /* ✅ 모바일 최적화 */
+    @media (max-width: 480px){
+      body{ padding: 14px; }
+      .row{ grid-template-columns: 1fr; gap:8px; }
+      input, select, button{ font-size:1.02rem; padding: 16px 12px; }
+      .box{ padding:14px; }
+      .section-title{ font-size:1.04rem; }
+      .highlight-primary{ font-size:1.02rem; }
+      .highlight-primary .amount{ font-size:2.1rem; }
+      .highlight-secondary{ font-size:1.02rem; }
+      .result{ font-size:1rem; }
+    }
+
+    /* ✅ 기본 버튼 */
+    .btn-primary{
+      background:#4f46e5; color:#fff; border: none; font-weight: 900; letter-spacing:.2px;
+      padding: 14px 16px; border-radius: 12px; cursor: pointer; margin-top: 4px;
+      box-shadow: 0 6px 18px rgba(79,70,229,.18);
+    }
+    .btn-primary:active{ transform: translateY(1px); }
+
+    /* ✅ 페이지 하단 스크롤 힌트(고정) */
+    .scroll-hint{
+      position: fixed;
+      left: 0; right: 0; bottom: 0;
+      height: 56px;
+      background: linear-gradient(to top, var(--bg) 70%, rgba(248,250,252,0));
+      padding-bottom: env(safe-area-inset-bottom, 0);
+      pointer-events: none;
+      z-index: 9999;
+      display: block;
+    }
+    .scroll-hint.hide{ display:none; }
+    .scroll-hint svg{
+      position: absolute;
+      left: 50%;
+      bottom: calc(8px + env(safe-area-inset-bottom, 0));
+      transform: translateX(-50%);
+      width: 22px; height: 22px; opacity: .55;
+      filter: drop-shadow(0 1px 1px rgba(0,0,0,.15));
+    }
+  </style>
+</head>
+<body>
+  <h2>부태리의 투자단지 찾기 + 대출 계산기</h2>
+
+  <div class="box">
+    <div class="section-title">① 기본 입력</div>
+    <label>연봉 (만원)</label>
+    <input type="number" id="income" inputmode="numeric" pattern="[0-9]*" oninput="updateHangulAmount('income')">
+    <span id="incomeText" class="hangul"></span>
+
+    <label>가진 자산 (만원)</label>
+    <input type="number" id="assets" inputmode="numeric" pattern="[0-9]*" oninput="updateHangulAmount('assets')">
+    <span id="assetsText" class="hangul"></span>
+
+    <div class="row">
+      <div>
+        <label>대출 금리 (연 %, 소수점 가능)</label>
+        <input type="number" id="interestRate" step="0.01" inputmode="decimal" value="3.5">
+      </div>
+      <div>
+        <label>상환 기간 (년)</label>
+        <input type="number" id="loanTerm" inputmode="numeric" pattern="[0-9]*" value="30">
+      </div>
+    </div>
+
+    <label>기존 대출 월 상환금 (만원)</label>
+    <input type="number" id="existingLoanMonthly" inputmode="numeric" pattern="[0-9]*" value="0">
+
+    <!-- 섹션 그라데이션 -->
+    <div class="section-fade" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <div class="box">
+    <div class="section-title">② 대출 구분</div>
+    <div class="checkbox-label"><input type="radio" name="loanDomain" value="bank" checked onclick="switchDomain()"> 금융권 대출</div>
+    <div class="checkbox-label"><input type="radio" name="loanDomain" value="policy" onclick="switchDomain()"> 정책성 대출(디딤돌/보금자리론)</div>
+
+    <!-- 섹션 그라데이션 -->
+    <div class="section-fade" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 금융권 옵션 -->
+  <div id="bankPanel" class="box">
+    <div class="section-title">금융권 세부 선택</div>
+    <div class="checkbox-label"><input type="radio" name="bankBorrower" value="general" checked> 일반차주</div>
+    <div class="checkbox-label"><input type="radio" name="bankBorrower" value="first"> 생애최초</div>
+    <div class="checkbox-label">
+      <input type="radio" name="bankBorrower" value="seomin"> 서민·실수요자
+      <span class="subtle">연소득 9천↓, 주택가격 8억↓, 무주택</span>
+    </div>
+
+    <div class="row-1">
+      <div>
+        <label>금융권 구분</label>
+        <select id="bankTier">
+          <option value="tier1">1금융권 (DSR 40%)</option>
+          <option value="tier2">2금융권 (DSR 50%)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row" style="margin-top:4px;">
+      <label class="checkbox-label" style="margin-bottom:0;">
+        <input type="checkbox" id="speculativeArea"> 투기과열지구
+      </label>
+      <label class="checkbox-label" style="margin-bottom:0;">
+        <input type="checkbox" id="capitalArea" onchange="updateCapitalInfo()"> 수도권 여부
+        <span class="subtle">DSR 스트레스 +3%</span>
+      </label>
+    </div>
+    <div id="stressAutoInfo" class="ok hide" style="margin:8px 0;">수도권으로 판단되어 DSR 스트레스 금리 <b>+3%</b>가 자동 적용됩니다.</div>
+
+    <!-- 섹션 그라데이션 -->
+    <div class="section-fade" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 정책성 옵션 -->
+  <div id="policyPanel" class="box hide">
+    <div class="section-title">정책성 대출 선택</div>
+    <div class="checkbox-label"><input type="radio" name="policyType" value="didim" checked onclick="switchPolicy()"> 디딤돌 대출</div>
+    <div class="checkbox-label"><input type="radio" name="policyType" value="bogum" onclick="switchPolicy()"> 보금자리론</div>
+
+    <div id="didimPanel" class="box" style="margin:10px 0 0;">
+      <div class="section-title">디딤돌 세부</div>
+      <div class="checkbox-label"><input type="radio" name="didimKind" value="normal" checked> 일반(LTV 70%, 한도 2억, 가격 ≤5억)</div>
+      <div class="checkbox-label"><input type="radio" name="didimKind" value="first"> 생애최초(LTV 70%, 한도 2.4억, 가격 ≤5억)</div>
+      <!-- ✅ 신혼, 2자녀 분리 -->
+      <div class="checkbox-label"><input type="radio" name="didimKind" value="newlyweds"> 신혼(LTV 70%, 한도 3.2억, 가격 ≤6억, 소득 ≤8,500만원)</div>
+      <div class="checkbox-label"><input type="radio" name="didimKind" value="twokids"> 2자녀(LTV 70%, 한도 3.2억, 가격 ≤6억, 소득 ≤7,000만원)</div>
+      <div class="checkbox-label"><input type="radio" name="didimKind" value="newborn"> 신생아(LTV 70%, 한도 4억, 가격 ≤5억)</div>
+      <div class="subtle">소득·순자산 요건(요약): 일반 6천, 생애최초 7천, <b>신혼 8.5천</b>, <b>2자녀 7천</b>, 신생아 7천 / 순자산 4.88억↓</div>
+
+      <div class="section-fade" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div id="bogumPanel" class="box hide" style="margin:10px 0 0;">
+      <div class="section-title">보금자리론 세부</div>
+      <div class="checkbox-label"><input type="radio" name="bogumKind" value="normal" checked> 일반(LTV 60%, 한도 3.6억, 가격 ≤6억)</div>
+      <div class="checkbox-label"><input type="radio" name="bogumKind" value="first"> 생애최초(LTV 70%, 한도 4.2억, 가격 ≤6억)</div>
+      <div class="row">
+        <div>
+          <label>비(非)아파트 여부</label>
+          <select id="bogumNonApt">
+            <option value="no" selected>아파트</option>
+            <option value="yes">비아파트 (LTV -5%p)</option>
+          </select>
+        </div>
+      </div>
+      <div class="subtle">소득 요건: 부부합산 연 7천만원 이하, 무주택 또는 1주택</div>
+
+      <div class="section-fade" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none">
+          <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+    </div>
+
+    <div class="section-fade" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none">
+        <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </div>
+  </div>
+
+  <!-- 기본(비-고정) 버튼 -->
+  <button class="btn-primary" onclick="calculate()">계산하기</button>
+
+  <div id="eligibility"></div>
+  <div id="result" class="result hide"></div>
+  <div id="calculationSteps" class="calculation-steps hide"></div>
+
+  <footer>
+    <a href="https://blog.naver.com/landlover333" target="_blank">부태리 블로그</a> | Made by 부태리 (2025)
+  </footer>
+
+  <!-- ✅ 페이지 하단 스크롤 힌트(고정) -->
+  <div class="scroll-hint" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none">
+      <path d="M6 9l6 6 6-6" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+
+  <script>
+    // ---- 유틸 ----
+    function formatAmount(num){
+      if(!num && num!==0) return '';
+      const oku=Math.floor(num/10000), man=num%10000;
+      return (oku>0?(oku+'억 '):'')+(man>0?(man+'만원'):(oku>0?'원':'0'));
+    }
+    function eok(n){ return (n/10000).toFixed(2); }
+    function updateHangulAmount(id){
+      const v=parseFloat(document.getElementById(id).value||0);
+      document.getElementById(id+'Text').textContent = v>0 ? formatAmount(Math.floor(v)) : '';
+    }
+    function monthlyPayment(principal, annualRate, months){
+      const r=annualRate/12;
+      if(r===0) return principal/months;
+      return principal*r*Math.pow(1+r,months)/(Math.pow(1+r,months)-1);
+    }
+    function updateCapitalInfo(){
+      const cap=document.getElementById('capitalArea').checked;
+      document.getElementById('stressAutoInfo').classList.toggle('hide',!cap);
+    }
+    function switchDomain(){
+      const d=document.querySelector('input[name="loanDomain"]:checked').value;
+      document.getElementById('bankPanel').classList.toggle('hide',d!=='bank');
+      document.getElementById('policyPanel').classList.toggle('hide',d!=='policy');
+      if(d==='policy') switchPolicy();
+      // 섹션 힌트 다시 평가
+      requestAnimationFrame(updateSectionFades);
+    }
+    function switchPolicy(){
+      const p=document.querySelector('input[name="loanDomain"]:checked')?.value==='policy'
+        ? document.querySelector('input[name="policyType"]:checked').value
+        : null;
+      if(!p) return;
+      document.getElementById('didimPanel').classList.toggle('hide',p!=='didim');
+      document.getElementById('bogumPanel').classList.toggle('hide',p!=='bogum');
+      requestAnimationFrame(updateSectionFades);
+    }
+
+    // ---- 메인 계산 ----
+    function calculate(){
+      const income=parseFloat(document.getElementById('income').value||0);        // 만원/년
+      const assets=parseFloat(document.getElementById('assets').value||0);        // 만원
+      const rate=parseFloat(document.getElementById('interestRate').value||0)/100;
+      const years=parseInt(document.getElementById('loanTerm').value||0);
+      const months=years*12;
+      const existMo=parseFloat(document.getElementById('existingLoanMonthly').value||0);
+
+      if(!income||!assets||!rate||!years){ alert('필수 항목을 모두 입력하세요'); return; }
+
+      const domain=document.querySelector('input[name="loanDomain"]:checked').value;
+      const isCapital=(domain==='bank' && document.getElementById('capitalArea').checked);
+
+      // 공통: DTI/DSR/LTV 기본치
+      let dti=0, dsr=0, ltv=0, productCap=Infinity, priceLimit=Infinity, incomeLimit=Infinity;
+
+      if(domain==='bank'){
+        const borrower=document.querySelector('input[name="bankBorrower"]:checked').value;
+        const tier=document.getElementById('bankTier').value;
+        const spec=document.getElementById('speculativeArea').checked;
+
+        if(borrower==='general'){ ltv = spec?0.4:0.7; dti = spec?0.4:0.5; }
+        else if(borrower==='first'){ ltv=0.7; dti=0.6; }
+        else { ltv=spec?0.6:0.8; dti=0.6; priceLimit=80000; incomeLimit=9000; }
+
+        dsr = (tier==='tier1')?0.4:0.5;
+      }else{
+        const p=document.querySelector('input[name="policyType"]:checked').value;
+        if(p==='didim'){
+          const k=document.querySelector('input[name="didimKind"]:checked').value;
+          ltv=0.7; dti=0.6; dsr=0;
+          if(k==='normal'){ productCap=20000; priceLimit=50000; incomeLimit=6000; }
+          else if(k==='first'){ productCap=24000; priceLimit=50000; incomeLimit=7000; }
+          else if(k==='newlyweds'){ productCap=32000; priceLimit=60000; incomeLimit=8500; }
+          else if(k==='twokids'){  productCap=32000; priceLimit=60000; incomeLimit=7000; }
+          else { productCap=40000; priceLimit=50000; incomeLimit=7000; } // 신생아
+        }else{
+          const k=document.querySelector('input[name="bogumKind"]:checked').value;
+          const nonApt=document.getElementById('bogumNonApt').value==='yes';
+          if(k==='normal'){ ltv=nonApt?0.55:0.6; productCap=36000; }
+          else { ltv=nonApt?0.65:0.7; productCap=42000; }
+          dti=0.6; dsr=0; priceLimit=60000; incomeLimit=7000;
+        }
+      }
+
+      // 1) DTI 한도
+      const a = monthlyPayment(1, rate, months); // 1만원 대출당 연 상환액(만원)
+      const dtiLimit = (income * dti) / (a * 12); // 만원
+
+      // 2) DSR 한도 (수도권 스트레스 +3% 반영)
+      let dsrLimit = Infinity, dsrLimitNoStress = Infinity;
+      if(dsr>0){
+        const stressRate = isCapital ? (rate+0.03) : rate;
+        const maxMo = (income/12) * dsr - (existMo||0);
+        if(maxMo>0){
+          const f = (r,m) => (r===0)? maxMo*m : maxMo*(1-Math.pow(1+r, -m))/r;
+          dsrLimit       = f(stressRate/12, months);
+          dsrLimitNoStress = f(rate/12, months);
+        }else{
+          dsrLimit = dsrLimitNoStress = 0;
+        }
+      }
+
+      // 3) LTV 한도 (자산 기반 역산: 자산 * ltv/(1-ltv))
+      const ltvLimitNew = (ltv > 0 && ltv < 1)
+        ? (assets * (ltv / (1 - ltv)))
+        : Infinity;
+
+      // 4) 절대 넘을 수 없는 1차 대출한도 (DTI/DSR/LTV/상품 최소값)
+      const hardCaps = [
+        {t:'DTI', v:dtiLimit},
+        ...(dsr>0 ? [{t:'DSR', v:dsrLimit}] : []),
+        {t:'LTV', v:ltvLimitNew},
+        ...(isFinite(productCap) ? [{t:'상품한도', v:productCap}] : [])
+      ];
+      const minHard = hardCaps.reduce((m,c)=> c.v<m.v?c:m, hardCaps[0]);
+      const prelimLoan = minHard.v; // 만원
+
+      // ---- 도메인별 최적화 ----
+      let finalLoan = prelimLoan;          // 만원
+      let investable = assets + finalLoan; // 만원
+      let usedAssets = Math.max(0, investable - finalLoan);
+      let reason = minHard.t;
+
+      // (A) 금융권: 가격구간별 대출캡(6/4/2억) - 투기과열지구 선택 시에만 적용
+      let priceBandNote = '';
+      let wasBandCapped = false;
+      const spec=document.getElementById('speculativeArea').checked;
+      if(domain==='bank' && spec){
+        const bands = [
+          {name:'≤15억', capLoan:60000,  pMin:0,      pMax:150000},
+          {name:'15~25억', capLoan:40000, pMin:150001, pMax:250000},
+          {name:'>25억',  capLoan:20000,  pMin:250001, pMax:Infinity}
+        ];
+
+        const candidates=[];
+        for(const b of bands){
+          const loanHere = Math.min(prelimLoan, b.capLoan);
+          if(loanHere<=0) continue;
+          let possibleP = loanHere + assets;
+          possibleP = Math.min(possibleP, b.pMax);
+          if(b.pMin>0 && possibleP < b.pMin) continue;
+          const assetsNeed = Math.max(0, possibleP - loanHere);
+          candidates.push({band:b.name, loan:loanHere, P:possibleP, A:assetsNeed, cap:b.capLoan});
+        }
+
+        if(candidates.length>0){
+          candidates.sort((x,y)=> (y.P-x.P) || (x.A-y.A) || (y.loan-x.loan));
+          const best=candidates[0];
+          wasBandCapped = (best.loan < prelimLoan) || (best.loan === best.cap);
+          finalLoan=best.loan; investable=best.P; usedAssets=best.A;
+          reason = wasBandCapped ? '가격구간 대출캡' : reason;
+          priceBandNote = `가격구간 '${best.band}' 최적 선택: 대출 ${eok(best.loan)}억, 자산 ${eok(best.A)}억 → 투자 ${eok(best.P)}억`;
+        }
+
+        if(priceLimit<Infinity && investable>priceLimit){
+          investable = priceLimit;
+          finalLoan  = Math.min(finalLoan, investable - usedAssets);
+          reason='가격한도';
+        }
+
+        // 가격구간 캡이 걸린 경우에만 최종 금액에 LTV 재적용
+        if (wasBandCapped && ltv > 0) {
+          const ltvLimitAfterBand = ltv * investable; // 만원
+          if (finalLoan > ltvLimitAfterBand) {
+            finalLoan  = ltvLimitAfterBand;
+            investable = assets + finalLoan;
+            usedAssets = Math.max(0, investable - finalLoan);
+            reason     = 'LTV(가격구간 후)';
+          }
+        }
+      }
+
+      // (B) 정책성
+      if(domain==='policy'){
+        const loanByCap = (productCap<Infinity)? Math.min(prelimLoan, productCap) : prelimLoan;
+        finalLoan = loanByCap;
+        investable = Math.min(assets + finalLoan, priceLimit);
+        usedAssets = Math.max(0, investable - finalLoan);
+        if(investable === priceLimit) reason = '가격한도';
+      }
+
+      // 표시용 LTV 한도: 최종 투자가능 금액 × LTV%
+      const ltvLimitForDisplay = (ltv > 0 && isFinite(investable))
+        ? (ltv * investable)
+        : Infinity;
+
+      // 월 상환/표시 계산
+      const moPay  = monthlyPayment(finalLoan, rate, months);
+      const moPrin = finalLoan/months;
+      const moInt  = moPay - moPrin;
+      const avgMoIncome = income/12;
+      const gap = avgMoIncome - moPay;
+      const repayRatio = (moPay/avgMoIncome)*100;
+      const leverageUtil = (finalLoan/investable)*100;
+
+      // 경고/자격
+      const eligDiv=document.getElementById('eligibility'); 
+      eligDiv.classList.add('hide'); eligDiv.innerHTML='';
+      const warns=[];
+      if(incomeLimit<Infinity && income>incomeLimit){
+        const txt = `${(domain==='bank')?'서민·실수요자':''} 연소득 <b>${eok(incomeLimit)}억원</b> 이하 요건`;
+        warns.push(`${txt} 초과 (현재: <b>${eok(income)}억원</b>)`);
+      }
+      if(priceLimit<Infinity && (assets + finalLoan) > priceLimit){
+        warns.push(`${(domain==='policy')?'정책성 상품':'서민·실수요자'} 가격한도 <b>${eok(priceLimit)}억원</b> 초과`);
+      }
+      const needEligibility = warns.length>0;
+      if(needEligibility){
+        eligDiv.classList.remove('hide');
+        eligDiv.innerHTML=`<div class="error">⚠️ 자격 확인: <br>• ${warns.join('<br>• ')}</div>`;
+      }
+
+      // 화면 출력
+      const isCapitalBank=(domain==='bank' && isCapital);
+      const stressLine = (dsr>0 && isCapitalBank) ? `<div class="pill">DSR 스트레스 금리: ${(rate*100+3).toFixed(2)}% (수도권 자동 +3%)</div>` : '';
+
+      const appliedLtvPct = (ltv>0) ? (ltv*100).toFixed(0) : '–';
+
+      // 강조 카드 (자격확인 배지 포함)
+      const badge = needEligibility ? `<span class="elig-badge" role="note" aria-label="자격확인 필수">자격확인 필수</span>` : '';
+      const investLine = `투자가능 금액대: 자산 ${formatAmount(Math.floor(usedAssets))} + 대출 ${eok(finalLoan)}억원 = <span class="amount">${formatAmount(Math.floor(investable))}</span>${badge}`;
+      const activeNote =
+        (reason==='LTV')?'LTV가 제한'
+        :(reason==='DTI')?'DTI가 제한'
+        :(reason==='DSR')?'DSR이 제한'
+        :(reason==='가격한도')?'가격(상품) 한도로 제한'
+        :(reason==='가격구간 대출캡')?'가격구간별 대출캡으로 제한'
+        :(reason==='LTV(가격구간 후)')?'LTV(가격구간 적용 후)로 제한'
+        :(reason==='상품한도')?'상품한도로 제한'
+        : '최소 한도 적용';
+
+      const loanLine = `💡 최종 대출 한도: <u>${eok(finalLoan)}억원</u> <span class="subtle">(${activeNote})</span>`;
+
+      const finalBox =
+        `<div class="highlight-card" role="status" aria-live="polite">
+           <div class="highlight-primary">${investLine}</div>
+           <div class="highlight-secondary">${loanLine}</div>
+         </div>`;
+
+      let limitHtml =
+        `<strong>DTI 한도:</strong> ${eok(dtiLimit)}억원 (DTI ${(dti*100).toFixed(0)}%)<br>`+
+        `<strong>DSR 한도:</strong> ${dsr===0?'비적용':`${eok(dsrLimit)}억원`}${(dsr>0&&isCapitalBank)?` <span class="subtle">(스트레스 미적용시 ${eok(dsrLimitNoStress)}억원)</span>`:''}<br>`+
+        `<strong>LTV 한도:</strong> ${ltv===0?'비적용':`${eok(ltvLimitForDisplay)}억원`} <span class="subtle">(적용 LTV: ${appliedLtvPct}%)</span><br>`;
+      if(productCap<Infinity) limitHtml+=`<strong>상품한도:</strong> ${eok(productCap)}억원<br>`;
+
+      document.getElementById('result').innerHTML =
+        `${finalBox}` +
+        `${limitHtml}${stressLine}<hr>`+
+        (priceBandNote?`<div class="warn" style="margin:10px 0;">${priceBandNote}</div>`:'')+
+        `<strong>공적 레버리지 이용률:</strong> ${isFinite(leverageUtil)?leverageUtil.toFixed(1):'–'}%<br><br>`+
+        `<strong>월 상환금(원리금균등):</strong> ${Math.floor(moPay)}만원<br>`+
+        `- 월 원금: ${Math.floor(moPrin)}만원 / 월 이자: ${Math.floor(moInt)}만원<br>`+
+        `<hr><strong>📊 월 소득 분석</strong><br>`+
+        `- 평균 월급: ${Math.floor(avgMoIncome)}만원<br>`+
+        `- 월 상환 후 잔여: ${Math.floor(gap)}만원<br>`+
+        `- 상환 비율(DSR 관점): ${isFinite(repayRatio)?repayRatio.toFixed(1):'–'}%`;
+
+      document.getElementById('result').classList.remove('hide');
+
+      // 계산 과정(요약)
+      const steps=document.getElementById('calculationSteps');
+      steps.innerHTML =
+        `<h3>✅ 한도 비교·최적화 과정</h3>
+         <p><b>Step 1</b> 소득기반 한도: DTI ${eok(dtiLimit)}억${dsr>0?`, DSR ${eok(dsrLimit)}억`:''}</p>
+         <p><b>Step 2</b> LTV 한도(역산): <b>${eok(ltvLimitNew)}억</b> <span class="subtle">(적용 LTV: ${appliedLtvPct}%)</span></p>
+         <p><b>Step 3</b> 절대캡 최소값 = <b>${eok(prelimLoan)}억 (${minHard.t})</b>${isFinite(productCap)?` (상품한도 포함)`:''}</p>
+         ${domain==='bank' ? `
+         <p><b>Step 4</b> 가격구간 최적화: ①≤15억 ≤6억 ②15~25억 ≤4억 ③>25억 ≤2억 → 투자금 최대 & 자산투입 최소</p>
+         <p><b>Step 5</b> (가격구간 제한 시) 최종 투자가능 금액 × LTV%로 대출 상한 재조정</p>` : `
+         <p><b>Step 4</b> 정책성: 상품캡/가격한도 내에서 대출 최대·자산 최소</p>`}
+         <p><b>Result</b> 대출 ${eok(finalLoan)}억 / 자산 ${eok(usedAssets)}억 → 투자 ${eok(investable)}억</p>`;
+      steps.classList.remove('hide');
+
+      // 스크롤 힌트 재평가
+      requestAnimationFrame(()=>{
+        updateSectionFades();
+        updateBottomHint();
+      });
+    }
+
+    /* ✅ 섹션/하단 스크롤 힌트 로직 */
+    function updateSectionFades(){
+      const boxes = document.querySelectorAll('.box');
+      const vh = window.innerHeight || document.documentElement.clientHeight;
+
+      boxes.forEach((box, idx)=>{
+        const fade = box.querySelector('.section-fade');
+        if(!fade) return;
+
+        // 보이는지/끝에 가까운지 판단
+        const r = box.getBoundingClientRect();
+        const inView = r.top < vh && r.bottom > 80;       // 일부라도 화면과 겹침
+        const hasMoreBelow = r.bottom > (vh + 16);        // 화면 아래로 더 내용이 남음
+        const notLast = idx !== (boxes.length - 1);       // 마지막 박스는 덜 표시
+
+        // 너무 작은 섹션은 숨김
+        const tallEnough = (r.height || 0) > 120;
+
+        const show = inView && hasMoreBelow && tallEnough && notLast;
+        fade.classList.toggle('show', show);
+      });
+    }
+
+    function updateBottomHint(){
+      const hint = document.querySelector('.scroll-hint');
+      if(!hint) return;
+      const THRESHOLD = 120; // 바닥 근처 여유(px)
+      const nearBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - THRESHOLD);
+      hint.classList.toggle('hide', nearBottom);
+    }
+
+    // 이벤트 연결
+    window.addEventListener('scroll', ()=>{
+      updateSectionFades();
+      updateBottomHint();
+    }, {passive:true});
+    window.addEventListener('resize', ()=>{
+      updateSectionFades();
+      updateBottomHint();
+    });
+
+    // 초기화
+    document.addEventListener('DOMContentLoaded', ()=>{
+      switchDomain();  // 패널 표시상태 정리
+      updateSectionFades();
+      updateBottomHint();
+      // 약간 지연 후 한 번 더 (폰 가상 키보드/폰트 로딩 대응)
+      setTimeout(()=>{ updateSectionFades(); updateBottomHint(); }, 80);
+    });
+  </script>
+</body>
+</html>

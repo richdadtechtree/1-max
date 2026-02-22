@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>부태리 실전 투자 최종 분석기</title>
+    <style>
+        :root {
+            --bg: #0b0c10; --card: #151822; --text: #e8eaf0; --muted: #96a0b5;
+            --accent: #4caf50; --accent-weak: #3a8f40; --ring: rgba(76,175,80,.35);
+            --blue: #2196f3; --orange: #ff9800; --purple: #9c27b0;
+        }
+        body {
+            background: linear-gradient(180deg, #0b0c10 0%, #0f1220 100%);
+            color: var(--text); font-family: 'Pretendard', sans-serif; margin: 0; padding: 20px;
+        }
+        .container {
+            max-width: 650px; margin: 0 auto; background: var(--card);
+            padding: 30px; border-radius: 18px; border: 1px solid rgba(255,255,255,0.06);
+        }
+        h2 { text-align: center; color: var(--text); margin-bottom: 25px; }
+        label { display: block; margin-bottom: 8px; font-weight: 700; color: var(--muted); font-size: 13px; }
+
+        /* 비과세 항목 강조 스타일 */
+        .highlight-label { color: var(--accent) !important; font-weight: 800; }
+        #isExempt { border: 1px solid var(--accent-weak); color: var(--accent); font-weight: bold; }
+
+        input, select {
+            width: 100%; padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(255,255,255,0.05); color: #fff; font-size: 16px; box-sizing: border-box;
+        }
+        .korean-unit { display: block; margin-top: 5px; font-size: 12px; color: var(--accent); min-height: 1.2em; }
+        .row { display: flex; gap: 12px; margin-bottom: 18px; }
+        .row > div { flex: 1; }
+
+        .section-box {
+            background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.08);
+            padding: 20px; border-radius: 12px; margin: 20px 0;
+        }
+
+        /* 투자 유형 선택 버튼 스타일 */
+        .invest-type-selector {
+            display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+        }
+        .invest-type-btn {
+            flex: 1; min-width: 120px; padding: 15px 10px; border: 2px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03); border-radius: 12px; cursor: pointer;
+            text-align: center; transition: all 0.3s;
+        }
+        .invest-type-btn:hover {
+            background: rgba(255,255,255,0.08); transform: translateY(-2px);
+        }
+        .invest-type-btn.active {
+            border-color: var(--accent); background: rgba(76,175,80,0.15);
+        }
+        .invest-type-btn.active.stock-kr { border-color: var(--blue); background: rgba(33,150,243,0.15); }
+        .invest-type-btn.active.stock-us { border-color: var(--orange); background: rgba(255,152,0,0.15); }
+        .invest-type-btn.active.other { border-color: var(--purple); background: rgba(156,39,176,0.15); }
+
+        .invest-type-btn .icon { font-size: 24px; margin-bottom: 5px; }
+        .invest-type-btn .label { font-size: 13px; font-weight: 700; color: var(--text); }
+        .invest-type-btn .desc { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+        .checkbox-label {
+            display: flex; align-items: center; gap: 10px; cursor: pointer;
+            font-size: 16px; font-weight: bold; color: var(--accent);
+        }
+        input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--accent); cursor: pointer; }
+
+        button {
+            width: 100%; padding: 18px; background: var(--accent); color: #fff;
+            border: none; border-radius: 999px; font-size: 18px; font-weight: 800; cursor: pointer;
+            transition: 0.2s; margin-top: 10px;
+        }
+        button:hover { transform: translateY(-2px); box-shadow: 0 5px 15px var(--ring); }
+
+        /* 결과 창 스타일 */
+        .roi-header {
+            text-align: center; padding: 35px; border-radius: 15px;
+            background: rgba(76,175,80,0.08); border: 1px solid var(--accent-weak);
+            margin-top: 30px; display: none;
+        }
+        .highlight-net { color: #ffb1b1; font-size: 40px; font-weight: 900; margin: 10px 0; }
+        .highlight-roi { color: var(--accent); font-size: 24px; font-weight: 700; }
+
+        /* 시각적 산식 디자인 */
+        .formula-container {
+            display: flex; align-items: center; justify-content: center;
+            margin-top: 30px; padding: 20px; background: rgba(0,0,0,0.4);
+            border-radius: 12px; font-family: 'Courier New', monospace; font-size: 13px; color: #fff;
+        }
+        .fraction { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; }
+        .numerator { border-bottom: 1px solid #777; padding: 0 10px 5px 10px; color: #ffb1b1; }
+        .denominator { padding: 5px 10px 0 10px; color: #add8e6; }
+        .math-symbol { font-size: 18px; margin: 0 12px; color: var(--muted); }
+
+        .analysis-table {
+            width: 100%; border-collapse: collapse; margin-top: 25px; background: #fff;
+            border-radius: 10px; overflow: hidden; color: #333; display: none;
+        }
+        .analysis-table th, .analysis-table td { padding: 12px 15px; border-bottom: 1px solid #eee; font-size: 14px; }
+        .analysis-table th { background: #f8f9fa; color: #666; text-align: left; }
+        .analysis-table td { text-align: right; font-weight: 600; }
+        .row-group { background: #f1f3f5; font-weight: bold; }
+        .row-tax { color: #d63301; background: #fff5f5; }
+
+        .info-box {
+            background: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.3);
+            padding: 12px 15px; border-radius: 8px; margin-top: 15px; font-size: 12px; color: var(--muted);
+        }
+        .info-box.warning {
+            background: rgba(255,152,0,0.1); border-color: rgba(255,152,0,0.3);
+        }
+
+        .checkbox-label-small {
+            display: flex; align-items: center; gap: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 600; color: var(--orange);
+        }
+        .checkbox-label-small input[type="checkbox"] {
+            width: 16px; height: 16px; accent-color: var(--orange);
+        }
+        .target-mode-active {
+            border-color: var(--orange) !important;
+            background: rgba(255,152,0,0.1) !important;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>실전 투자 세후 수익률 분석</h2>
+
+    <!-- 투자 유형 선택 -->
+    <div class="section-box">
+        <label style="margin-bottom: 15px;">투자 유형 선택</label>
+        <div class="invest-type-selector">
+            <div class="invest-type-btn active" onclick="selectInvestType('realestate')" id="btn-realestate">
+                <div class="icon">🏠</div>
+                <div class="label">부동산</div>
+                <div class="desc">취득세/양도세 반영</div>
+            </div>
+            <div class="invest-type-btn stock-kr" onclick="selectInvestType('stock-kr')" id="btn-stock-kr">
+                <div class="icon">🇰🇷</div>
+                <div class="label">국내주식</div>
+                <div class="desc">수수료 반영</div>
+            </div>
+            <div class="invest-type-btn stock-us" onclick="selectInvestType('stock-us')" id="btn-stock-us">
+                <div class="icon">🇺🇸</div>
+                <div class="label">미국주식</div>
+                <div class="desc">양도세 22% + 수수료</div>
+            </div>
+            <div class="invest-type-btn other" onclick="selectInvestType('other')" id="btn-other">
+                <div class="icon">📊</div>
+                <div class="label">기타</div>
+                <div class="desc">직접 비용 입력</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div>
+            <label>현금 투자 원금</label>
+            <input type="number" id="investment" oninput="updateKorean('investment', 'korInv')">
+            <span id="korInv" class="korean-unit"></span>
+        </div>
+        <div>
+            <label>투자 기간 (년)</label>
+            <input type="number" id="period" value="2" step="0.1">
+        </div>
+    </div>
+
+    <!-- 대출 섹션 (부동산/기타) -->
+    <div class="row" id="loanSection">
+        <div>
+            <label>대출금액</label>
+            <input type="number" id="loan" value="0" oninput="updateKorean('loan', 'korLoan')">
+            <span id="korLoan" class="korean-unit"></span>
+        </div>
+        <div>
+            <label>금리 (%)</label>
+            <input type="number" id="rate" step="0.1" value="4.5">
+        </div>
+    </div>
+
+    <!-- 부동산 전용 필드 -->
+    <div id="reFields">
+        <div class="row">
+            <div>
+                <label>부동산 매입가</label>
+                <input type="number" id="buyPrice" oninput="updateKorean('buyPrice', 'korBuy')">
+                <span id="korBuy" class="korean-unit"></span>
+            </div>
+            <div>
+                <label class="highlight-label">1주택 비과세 여부</label>
+                <select id="isExempt" onchange="toggleResidenceField()">
+                    <option value="y">적용 (12억 이하 비과세)</option>
+                    <option value="n">미적용 (일반 과세)</option>
+                </select>
+            </div>
+        </div>
+        <!-- 거주기간 입력 (비과세 미적용 시에만 표시) -->
+        <div class="row" id="residenceRow" style="display:none;">
+            <div>
+                <label>거주기간 (년)</label>
+                <input type="number" id="residencePeriod" step="0.1" value="0" placeholder="실거주 기간">
+                <span class="korean-unit" style="color:var(--blue);">보유기간은 투자기간 사용</span>
+            </div>
+            <div>
+                <label>필요경비 (중개비 외 추가)</label>
+                <input type="number" id="additionalExpense" value="0" oninput="updateKorean('additionalExpense', 'korAddExp')">
+                <span id="korAddExp" class="korean-unit"></span>
+            </div>
+        </div>
+        <div id="residenceInfo" class="info-box" style="display:none;">
+            <strong>장기보유특별공제 (3년 이상 보유 시 적용):</strong><br>
+            • 2년 이상 거주: 보유 4%/년(최대40%) + 거주 4%/년(최대40%) = 최대 80%<br>
+            • 2년 미만 거주: 보유 2%/년 = 최대 30%<br>
+            • 3년 미만 보유 시: 공제 없음
+        </div>
+    </div>
+
+    <!-- 국내주식 전용 필드 -->
+    <div id="stockKrFields" style="display:none;">
+        <div class="row">
+            <div>
+                <label>증권사 수수료율 (%)</label>
+                <input type="number" id="krFeeRate" step="0.001" value="0.015" placeholder="예: 0.015">
+            </div>
+            <div>
+                <label>거래세율 (%)</label>
+                <input type="number" id="krTaxRate" step="0.01" value="0.18" placeholder="코스피 0.18%">
+            </div>
+        </div>
+        <div class="info-box">
+            일반 개인투자자는 양도소득세 비과세 (대주주 제외)<br>
+            수수료: 매수/매도 각각 적용 | 거래세: 매도 시에만 적용
+        </div>
+    </div>
+
+    <!-- 미국주식 전용 필드 -->
+    <div id="stockUsFields" style="display:none;">
+        <div class="row">
+            <div>
+                <label>증권사 수수료율 (%)</label>
+                <input type="number" id="usFeeRate" step="0.001" value="0.25" placeholder="예: 0.25">
+            </div>
+            <div>
+                <label>환전 스프레드 (%)</label>
+                <input type="number" id="usExchangeRate" step="0.01" value="0.25" placeholder="예: 0.25">
+            </div>
+        </div>
+        <div class="info-box warning">
+            <strong>미국주식 양도소득세:</strong> 연 250만원 기본공제 후 22% (소득세 20% + 지방세 2%)<br>
+            수수료: 매수/매도 각각 적용 | 환전: 매수/매도 각각 적용
+        </div>
+    </div>
+
+    <!-- 기타 투자 전용 필드 -->
+    <div id="otherFields" style="display:none;">
+        <div class="row">
+            <div>
+                <label>예상 총 수수료/비용</label>
+                <input type="number" id="otherFee" value="0" oninput="updateKorean('otherFee', 'korOtherFee')">
+                <span id="korOtherFee" class="korean-unit"></span>
+            </div>
+            <div>
+                <label>예상 세금</label>
+                <input type="number" id="otherTax" value="0" oninput="updateKorean('otherTax', 'korOtherTax')">
+                <span id="korOtherTax" class="korean-unit"></span>
+            </div>
+        </div>
+        <div class="info-box">
+            기타 투자의 경우 수수료와 세금을 직접 입력하세요.
+        </div>
+    </div>
+
+    <div class="input-group">
+        <div class="row" style="align-items: center; margin-bottom: 8px;">
+            <label id="profitLabel" style="margin-bottom: 0; flex: 1;">예상 시세 차익 (매도가 - 매수가)</label>
+            <label class="checkbox-label-small">
+                <input type="checkbox" id="isTargetNet" onchange="toggleTargetMode()">
+                <span>실제 수령 금액</span>
+            </label>
+        </div>
+        <input type="number" id="expectedProfit" oninput="updateKorean('expectedProfit', 'korProfit')">
+        <span id="korProfit" class="korean-unit"></span>
+    </div>
+
+    <!-- 역계산 결과 표시 -->
+    <div id="reverseCalcResult" class="info-box" style="display:none; margin-bottom: 15px; background: rgba(76,175,80,0.1); border-color: rgba(76,175,80,0.3);">
+        <strong>필요 시세 차익:</strong> <span id="requiredProfit">0</span>원<br>
+        <strong>필요 매도가:</strong> <span id="requiredSalePrice">0</span>원
+    </div>
+
+    <button onclick="runAnalysis()">수익률 및 순수익 분석</button>
+
+    <div class="roi-header" id="roiHeader">
+        <div style="font-size:13px; color:var(--muted);">모든 공제 후 최종 실질 순수익</div>
+        <div id="resNet" class="highlight-net">0원</div>
+        <div id="resAnnualROI" class="highlight-roi">0%</div>
+        <div style="font-size:12px; color:var(--muted); margin-top:5px;">(연평균 실질 수익률)</div>
+
+        <div class="formula-container">
+            <div class="fraction">
+                <div class="numerator">(<span id="f-profit">0</span> - <span id="f-exp">0</span> - <span id="f-int">0</span>)</div>
+                <div class="denominator">(<span id="f-inv">0</span> × <span id="f-period">0</span>)</div>
+            </div>
+            <span class="math-symbol">× 100 = </span>
+            <span id="f-result" style="font-weight:bold; color:var(--accent);">0%</span>
+        </div>
+    </div>
+
+    <table class="analysis-table" id="analysisTable">
+        <tbody id="tableBody"></tbody>
+    </table>
+</div>
+
+<script>
+    let currentInvestType = 'realestate';
+    let isTargetNetMode = false;
+
+    function toggleResidenceField() {
+        const isExempt = document.getElementById('isExempt').value === 'y';
+        document.getElementById('residenceRow').style.display = isExempt ? 'none' : 'flex';
+        document.getElementById('residenceInfo').style.display = isExempt ? 'none' : 'block';
+    }
+
+    function toggleTargetMode() {
+        isTargetNetMode = document.getElementById('isTargetNet').checked;
+        const label = document.getElementById('profitLabel');
+        const input = document.getElementById('expectedProfit');
+
+        if (isTargetNetMode) {
+            label.innerText = '목표 실수령액 (세후 순수익)';
+            label.style.color = 'var(--orange)';
+            input.classList.add('target-mode-active');
+        } else {
+            label.innerText = '예상 시세 차익 (매도가 - 매수가)';
+            label.style.color = 'var(--muted)';
+            input.classList.remove('target-mode-active');
+            document.getElementById('reverseCalcResult').style.display = 'none';
+        }
+    }
+
+    function numberToKorean(n) {
+        if (!n || isNaN(n)) return "";
+        const units = ['', '만', '억', '조'];
+        let res = []; let i = 0;
+        while (n > 0) {
+            let mod = n % 10000;
+            if (mod > 0) res.push(mod.toLocaleString() + units[i]);
+            n = Math.floor(n / 10000); i++;
+        }
+        return res.reverse().join(' ') + " 원";
+    }
+
+    function updateKorean(id, spanId) {
+        const val = document.getElementById(id).value;
+        document.getElementById(spanId).innerText = numberToKorean(Number(val));
+    }
+
+    function selectInvestType(type) {
+        currentInvestType = type;
+
+        // 모든 버튼 비활성화
+        document.querySelectorAll('.invest-type-btn').forEach(btn => btn.classList.remove('active'));
+        document.getElementById('btn-' + type).classList.add('active');
+
+        // 모든 필드 숨기기
+        document.getElementById('reFields').style.display = 'none';
+        document.getElementById('stockKrFields').style.display = 'none';
+        document.getElementById('stockUsFields').style.display = 'none';
+        document.getElementById('otherFields').style.display = 'none';
+        document.getElementById('loanSection').style.display = 'none';
+
+        // 해당 유형 필드 표시
+        if (type === 'realestate') {
+            document.getElementById('reFields').style.display = 'block';
+            document.getElementById('loanSection').style.display = 'flex';
+            toggleResidenceField(); // 비과세 여부에 따라 거주기간 필드 표시
+        } else if (type === 'stock-kr') {
+            document.getElementById('stockKrFields').style.display = 'block';
+        } else if (type === 'stock-us') {
+            document.getElementById('stockUsFields').style.display = 'block';
+        } else if (type === 'other') {
+            document.getElementById('otherFields').style.display = 'block';
+            document.getElementById('loanSection').style.display = 'flex';
+        }
+
+        // 결과 초기화
+        document.getElementById('roiHeader').style.display = 'none';
+        document.getElementById('analysisTable').style.display = 'none';
+        document.getElementById('reverseCalcResult').style.display = 'none';
+    }
+
+    // 장기보유특별공제율 계산 (3년 이상 보유 시에만 적용)
+    function calculateLongTermDeduction(holdingPeriod, residencePeriod) {
+        // 3년 미만 보유 시 공제 없음
+        if (holdingPeriod < 3) return 0;
+
+        let rate = 0;
+
+        if (residencePeriod >= 2) {
+            // 2년 이상 거주: 보유 4%/년(최대40%) + 거주 4%/년(최대40%) = 최대 80%
+            const holdingRate = Math.min(Math.floor(holdingPeriod) * 0.04, 0.40);
+            const residenceRate = Math.min(Math.floor(residencePeriod) * 0.04, 0.40);
+            rate = holdingRate + residenceRate;
+        } else {
+            // 2년 미만 거주: 보유 2%/년 = 최대 30%
+            rate = Math.min(Math.floor(holdingPeriod) * 0.02, 0.30);
+        }
+
+        return Math.min(rate, 0.80); // 최대 80%
+    }
+
+    // 소득세 세율 및 누진공제 적용 (2026년 기준)
+    function applyTaxRate(taxableIncome) {
+        if (taxableIncome <= 0) return { tax: 0, rate: 0, deduction: 0 };
+
+        let tax = 0, rate = 0, deduction = 0;
+
+        if (taxableIncome <= 14e6) {
+            rate = 6; deduction = 0;
+            tax = taxableIncome * 0.06;
+        } else if (taxableIncome <= 50e6) {
+            rate = 15; deduction = 126;
+            tax = taxableIncome * 0.15 - 1.26e6;
+        } else if (taxableIncome <= 88e6) {
+            rate = 24; deduction = 576;
+            tax = taxableIncome * 0.24 - 5.76e6;
+        } else if (taxableIncome <= 150e6) {
+            rate = 35; deduction = 1544;
+            tax = taxableIncome * 0.35 - 15.44e6;
+        } else if (taxableIncome <= 300e6) {
+            rate = 38; deduction = 1994;
+            tax = taxableIncome * 0.38 - 19.94e6;
+        } else if (taxableIncome <= 500e6) {
+            rate = 40; deduction = 2594;
+            tax = taxableIncome * 0.40 - 25.94e6;
+        } else if (taxableIncome <= 1000e6) {
+            rate = 42; deduction = 3594;
+            tax = taxableIncome * 0.42 - 35.94e6;
+        } else {
+            rate = 45; deduction = 6594;
+            tax = taxableIncome * 0.45 - 65.94e6;
+        }
+
+        return { tax, rate, deduction };
+    }
+
+    function calculateTax(gain, period, isExempt, salePrice, additionalExp = 0, residencePeriod = 0) {
+        if (gain <= 0) return { tax: 0, label: "수익 없음", details: null };
+
+        let details = {
+            totalGain: gain,
+            taxableGain: 0,
+            longTermRate: 0,
+            incomeAmount: 0,
+            taxBase: 0,
+            taxBeforeLocal: 0,
+            taxRate: 0,        // 적용 세율 (%)
+            taxDeduction: 0    // 누진공제액 (만원)
+        };
+
+        // 단기 양도 (1년 미만: 70%, 1~2년: 60%)
+        if (period < 1) {
+            const netGain = gain - 2500000;
+            if (netGain <= 0) return { tax: 0, label: "기본공제 이하", details: null };
+            const tax = netGain * 0.7;
+            return { tax: Math.floor(tax * 1.1), label: "70% 단기", details: null };
+        } else if (period < 2) {
+            const netGain = gain - 2500000;
+            if (netGain <= 0) return { tax: 0, label: "기본공제 이하", details: null };
+            const tax = netGain * 0.6;
+            return { tax: Math.floor(tax * 1.1), label: "60% 단기", details: null };
+        }
+
+        // 2년 이상 보유 시
+        if (isExempt) {
+            // 비과세 적용
+            if (salePrice <= 12e8) return { tax: 0, label: "비과세", details: null };
+
+            // 12억 초과 고가주택: 초과분만 과세 (장특공 80% 적용)
+            details.taxableGain = gain * ((salePrice - 12e8) / salePrice);
+            details.longTermRate = 0.80; // 비과세 요건 충족 시 최대 공제
+            details.incomeAmount = details.taxableGain * (1 - details.longTermRate);
+            details.taxBase = Math.max(details.incomeAmount - 2500000, 0);
+
+            const taxResult = applyTaxRate(details.taxBase);
+            details.taxBeforeLocal = taxResult.tax;
+            details.taxRate = taxResult.rate;
+            details.taxDeduction = taxResult.deduction;
+
+            return {
+                tax: Math.floor(details.taxBeforeLocal * 1.1),
+                label: "12억초과 비과세",
+                details: details
+            };
+        } else {
+            // 비과세 미적용 (일반 과세)
+            // 1. 12억 초과분만 과세
+            if (salePrice <= 12e8) {
+                // 12억 이하면 전체 과세
+                details.taxableGain = gain;
+            } else {
+                // 12억 초과분만 과세
+                details.taxableGain = gain * ((salePrice - 12e8) / salePrice);
+            }
+
+            // 2. 장기보유특별공제 적용
+            details.longTermRate = calculateLongTermDeduction(period, residencePeriod);
+
+            // 3. 양도소득금액 = 과세대상양도차익 × (1 - 장특공율)
+            details.incomeAmount = details.taxableGain * (1 - details.longTermRate);
+
+            // 4. 과세표준 = 양도소득금액 - 기본공제(250만원)
+            details.taxBase = Math.max(details.incomeAmount - 2500000, 0);
+
+            // 5. 세액 계산 (누진세율 적용)
+            const taxResult = applyTaxRate(details.taxBase);
+            details.taxBeforeLocal = taxResult.tax;
+            details.taxRate = taxResult.rate;
+            details.taxDeduction = taxResult.deduction;
+
+            // 6. 지방세 포함 (×1.1)
+            const finalTax = Math.floor(details.taxBeforeLocal * 1.1);
+
+            let label = salePrice > 12e8 ? "12억초과 장특공" : "일반 장특공";
+            label += ` ${Math.round(details.longTermRate * 100)}%`;
+
+            return { tax: finalTax, label: label, details: details };
+        }
+    }
+
+    function calculateUsStockTax(gain) {
+        // 미국주식 양도소득세: 연 250만원 기본공제 후 22%
+        if (gain <= 0) return { tax: 0, label: "수익 없음" };
+        const netGain = gain - 2500000; // 250만원 기본공제
+        if (netGain <= 0) return { tax: 0, label: "기본공제 이하" };
+        const tax = Math.floor(netGain * 0.22); // 22% (소득세 20% + 지방세 2%)
+        return { tax: tax, label: "22% 과세" };
+    }
+
+    // 시세차익으로부터 총 비용 계산 (역계산용)
+    function calculateTotalExpense(profit, inv, period) {
+        let totalExp = 0;
+        let interest = 0;
+
+        if (currentInvestType === 'realestate') {
+            const loan = parseFloat(document.getElementById('loan').value) || 0;
+            const rate = (parseFloat(document.getElementById('rate').value) || 0) / 100;
+            const buyPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
+            const isExempt = document.getElementById('isExempt').value === 'y';
+            const salePrice = buyPrice + profit;
+            const additionalExp = parseFloat(document.getElementById('additionalExpense').value) || 0;
+            const residencePeriod = parseFloat(document.getElementById('residencePeriod').value) || 0;
+
+            interest = loan * rate * period;
+
+            let acqRate = (buyPrice <= 6e8) ? 0.01 : (buyPrice <= 9e8) ? (buyPrice * (2/3e8) - 3) / 100 : 0.03;
+            const acq = Math.floor(buyPrice * acqRate);
+            const edu = Math.floor(acq * 0.1);
+            const legalFees = 880000 + 150000 + 18000;
+            const brokerBuy = (buyPrice <= 9e8) ? buyPrice * 0.004 * 1.1 : buyPrice * 0.005 * 1.1;
+            const buyExp = acq + edu + legalFees + brokerBuy;
+
+            const taxObj = calculateTax(profit, period, isExempt, salePrice, additionalExp, residencePeriod);
+            const brokerSell = brokerBuy;
+            totalExp = buyExp + brokerSell + additionalExp + taxObj.tax;
+
+        } else if (currentInvestType === 'stock-kr') {
+            const feeRate = (parseFloat(document.getElementById('krFeeRate').value) || 0) / 100;
+            const taxRate = (parseFloat(document.getElementById('krTaxRate').value) || 0) / 100;
+
+            const buyFee = Math.floor(inv * feeRate);
+            const sellAmount = inv + profit;
+            const sellFee = Math.floor(sellAmount * feeRate);
+            const tradeTax = Math.floor(sellAmount * taxRate);
+            totalExp = buyFee + sellFee + tradeTax;
+
+        } else if (currentInvestType === 'stock-us') {
+            const feeRate = (parseFloat(document.getElementById('usFeeRate').value) || 0) / 100;
+            const exchangeRate = (parseFloat(document.getElementById('usExchangeRate').value) || 0) / 100;
+
+            const buyFee = Math.floor(inv * feeRate);
+            const buyExchange = Math.floor(inv * exchangeRate);
+            const sellAmount = inv + profit;
+            const sellFee = Math.floor(sellAmount * feeRate);
+            const sellExchange = Math.floor(sellAmount * exchangeRate);
+            const taxObj = calculateUsStockTax(profit);
+            totalExp = buyFee + buyExchange + sellFee + sellExchange + taxObj.tax;
+
+        } else if (currentInvestType === 'other') {
+            const loan = parseFloat(document.getElementById('loan').value) || 0;
+            const rate = (parseFloat(document.getElementById('rate').value) || 0) / 100;
+            const otherFee = parseFloat(document.getElementById('otherFee').value) || 0;
+            const otherTax = parseFloat(document.getElementById('otherTax').value) || 0;
+
+            interest = loan * rate * period;
+            totalExp = otherFee + otherTax;
+        }
+
+        return { totalExp, interest };
+    }
+
+    // 목표 순수익 달성을 위한 필요 시세차익 역계산 (이진 탐색)
+    function reverseCalculateProfit(targetNet, inv, period) {
+        let low = targetNet;
+        let high = targetNet * 3; // 초기 상한
+        let result = targetNet;
+
+        // 상한 조정 (비용이 많을 경우)
+        for (let i = 0; i < 10; i++) {
+            const { totalExp, interest } = calculateTotalExpense(high, inv, period);
+            if (high - totalExp - interest >= targetNet) break;
+            high *= 2;
+        }
+
+        // 이진 탐색
+        for (let i = 0; i < 50; i++) {
+            const mid = (low + high) / 2;
+            const { totalExp, interest } = calculateTotalExpense(mid, inv, period);
+            const netProfit = mid - totalExp - interest;
+
+            if (Math.abs(netProfit - targetNet) < 1000) {
+                result = mid;
+                break;
+            }
+
+            if (netProfit < targetNet) {
+                low = mid;
+            } else {
+                high = mid;
+                result = mid;
+            }
+        }
+
+        return Math.ceil(result);
+    }
+
+    function runAnalysis() {
+        const inv = parseFloat(document.getElementById('investment').value) || 0;
+        const period = parseFloat(document.getElementById('period').value) || 1;
+        let inputValue = parseFloat(document.getElementById('expectedProfit').value) || 0;
+
+        if (inv <= 0) { alert("투자 원금을 입력해주세요."); return; }
+
+        let profit = inputValue;
+        let requiredProfit = 0;
+        let requiredSalePrice = 0;
+
+        // 역계산 모드: 목표 순수익으로부터 필요 시세차익 계산
+        if (isTargetNetMode) {
+            const targetNet = inputValue;
+            requiredProfit = reverseCalculateProfit(targetNet, inv, period);
+            profit = requiredProfit;
+
+            // 부동산인 경우 필요 매도가 계산
+            if (currentInvestType === 'realestate') {
+                const buyPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
+                requiredSalePrice = buyPrice + requiredProfit;
+            } else {
+                requiredSalePrice = inv + requiredProfit;
+            }
+
+            document.getElementById('requiredProfit').innerText = Math.round(requiredProfit).toLocaleString();
+            document.getElementById('requiredSalePrice').innerText = Math.round(requiredSalePrice).toLocaleString();
+            document.getElementById('reverseCalcResult').style.display = 'block';
+        } else {
+            document.getElementById('reverseCalcResult').style.display = 'none';
+        }
+
+        let totalExp = 0;
+        let interest = 0;
+        let rows = "";
+
+        if (currentInvestType === 'realestate') {
+            // 부동산 계산
+            const loan = parseFloat(document.getElementById('loan').value) || 0;
+            const rate = (parseFloat(document.getElementById('rate').value) || 0) / 100;
+            const buyPrice = parseFloat(document.getElementById('buyPrice').value) || 0;
+            const isExempt = document.getElementById('isExempt').value === 'y';
+            const salePrice = buyPrice + profit;
+            const additionalExp = parseFloat(document.getElementById('additionalExpense').value) || 0;
+            const residencePeriod = parseFloat(document.getElementById('residencePeriod').value) || 0;
+
+            interest = loan * rate * period;
+
+            let acqRate = (buyPrice <= 6e8) ? 0.01 : (buyPrice <= 9e8) ? (buyPrice * (2/3e8) - 3) / 100 : 0.03;
+            const acq = Math.floor(buyPrice * acqRate);
+            const edu = Math.floor(acq * 0.1);
+            const legalFees = 880000 + 150000 + 18000;
+            const brokerBuy = (buyPrice <= 9e8) ? buyPrice * 0.004 * 1.1 : buyPrice * 0.005 * 1.1;
+            const brokerSell = brokerBuy;
+            const buyExp = acq + edu + legalFees + brokerBuy;
+
+            // 양도세 계산 (필요경비 = 중개비 + 추가비용)
+            const necessaryExpenses = brokerBuy + brokerSell + additionalExp;
+            const taxObj = calculateTax(profit, period, isExempt, salePrice, additionalExp, residencePeriod);
+            totalExp = buyExp + brokerSell + additionalExp + taxObj.tax;
+
+            rows += `<tr class="row-group"><td colspan="2">1. 부동산 거래 경비 명세</td></tr>`;
+            rows += `<tr><td>취득세 및 교육세</td><td>${(acq + edu).toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>법무사 및 부대비용</td><td>${legalFees.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>부동산 중개수수료</td><td>${(brokerBuy + brokerSell).toLocaleString()}원 (2회)</td></tr>`;
+            if (additionalExp > 0) {
+                rows += `<tr><td>추가 필요경비</td><td>${additionalExp.toLocaleString()}원</td></tr>`;
+            }
+
+            // 양도세 상세 내역 표시
+            if (taxObj.details) {
+                const d = taxObj.details;
+                rows += `<tr class="row-group"><td colspan="2">2. 양도소득세 계산 내역</td></tr>`;
+                rows += `<tr><td>전체 양도차익</td><td>${Math.round(d.totalGain).toLocaleString()}원</td></tr>`;
+                if (salePrice > 12e8) {
+                    rows += `<tr><td>과세대상 양도차익 (12억 초과분)</td><td>${Math.round(d.taxableGain).toLocaleString()}원</td></tr>`;
+                }
+                rows += `<tr><td>장기보유특별공제율</td><td>${Math.round(d.longTermRate * 100)}%</td></tr>`;
+                rows += `<tr><td>양도소득금액 (공제 후)</td><td>${Math.round(d.incomeAmount).toLocaleString()}원</td></tr>`;
+                rows += `<tr><td>과세표준 (−250만원)</td><td>${Math.round(d.taxBase).toLocaleString()}원</td></tr>`;
+                const deductionText = d.taxDeduction > 0 ? ` −${d.taxDeduction}만원` : '';
+                rows += `<tr><td>산출세액 (${d.taxRate}%${deductionText})</td><td>${Math.round(d.taxBeforeLocal).toLocaleString()}원</td></tr>`;
+                rows += `<tr class="row-tax"><td>최종 양도세 (×1.1 지방세)</td><td>${taxObj.tax.toLocaleString()}원</td></tr>`;
+            } else {
+                rows += `<tr class="row-tax"><td>양도소득세 (${taxObj.label})</td><td>${taxObj.tax.toLocaleString()}원</td></tr>`;
+            }
+
+        } else if (currentInvestType === 'stock-kr') {
+            // 국내주식 계산
+            const feeRate = (parseFloat(document.getElementById('krFeeRate').value) || 0) / 100;
+            const taxRate = (parseFloat(document.getElementById('krTaxRate').value) || 0) / 100;
+
+            const buyFee = Math.floor(inv * feeRate); // 매수 수수료
+            const sellAmount = inv + profit;
+            const sellFee = Math.floor(sellAmount * feeRate); // 매도 수수료
+            const tradeTax = Math.floor(sellAmount * taxRate); // 거래세 (매도시)
+
+            totalExp = buyFee + sellFee + tradeTax;
+
+            rows += `<tr class="row-group"><td colspan="2">1. 국내주식 거래 비용</td></tr>`;
+            rows += `<tr><td>매수 수수료 (${(feeRate*100).toFixed(3)}%)</td><td>${buyFee.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>매도 수수료 (${(feeRate*100).toFixed(3)}%)</td><td>${sellFee.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>거래세 (${(taxRate*100).toFixed(2)}%)</td><td>${tradeTax.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>양도소득세</td><td>비과세 (일반 개인)</td></tr>`;
+
+        } else if (currentInvestType === 'stock-us') {
+            // 미국주식 계산
+            const feeRate = (parseFloat(document.getElementById('usFeeRate').value) || 0) / 100;
+            const exchangeRate = (parseFloat(document.getElementById('usExchangeRate').value) || 0) / 100;
+
+            const buyFee = Math.floor(inv * feeRate); // 매수 수수료
+            const buyExchange = Math.floor(inv * exchangeRate); // 매수 환전
+            const sellAmount = inv + profit;
+            const sellFee = Math.floor(sellAmount * feeRate); // 매도 수수료
+            const sellExchange = Math.floor(sellAmount * exchangeRate); // 매도 환전
+
+            const taxObj = calculateUsStockTax(profit);
+
+            totalExp = buyFee + buyExchange + sellFee + sellExchange + taxObj.tax;
+
+            rows += `<tr class="row-group"><td colspan="2">1. 미국주식 거래 비용</td></tr>`;
+            rows += `<tr><td>매수 수수료 (${(feeRate*100).toFixed(2)}%)</td><td>${buyFee.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>매수 환전 (${(exchangeRate*100).toFixed(2)}%)</td><td>${buyExchange.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>매도 수수료 (${(feeRate*100).toFixed(2)}%)</td><td>${sellFee.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td>매도 환전 (${(exchangeRate*100).toFixed(2)}%)</td><td>${sellExchange.toLocaleString()}원</td></tr>`;
+            rows += `<tr class="row-tax"><td>양도소득세 (${taxObj.label})</td><td>${taxObj.tax.toLocaleString()}원</td></tr>`;
+            rows += `<tr><td colspan="2" style="font-size:11px; color:#888; text-align:left;">* 250만원 기본공제 후 22% (소득세 20% + 지방세 2%)</td></tr>`;
+
+        } else if (currentInvestType === 'other') {
+            // 기타 투자
+            const loan = parseFloat(document.getElementById('loan').value) || 0;
+            const rate = (parseFloat(document.getElementById('rate').value) || 0) / 100;
+            const otherFee = parseFloat(document.getElementById('otherFee').value) || 0;
+            const otherTax = parseFloat(document.getElementById('otherTax').value) || 0;
+
+            interest = loan * rate * period;
+            totalExp = otherFee + otherTax;
+
+            rows += `<tr class="row-group"><td colspan="2">1. 기타 투자 비용</td></tr>`;
+            rows += `<tr><td>수수료/비용</td><td>${otherFee.toLocaleString()}원</td></tr>`;
+            rows += `<tr class="row-tax"><td>세금</td><td>${otherTax.toLocaleString()}원</td></tr>`;
+        }
+
+        const netProfit = profit - totalExp - interest;
+        const annualROI = (netProfit / (inv * period)) * 100;
+
+        document.getElementById('f-profit').innerText = Math.round(profit).toLocaleString();
+        document.getElementById('f-exp').innerText = Math.round(totalExp).toLocaleString();
+        document.getElementById('f-int').innerText = Math.round(interest).toLocaleString();
+        document.getElementById('f-inv').innerText = inv.toLocaleString();
+        document.getElementById('f-period').innerText = period;
+        document.getElementById('f-result').innerText = annualROI.toFixed(2) + "%";
+
+        document.getElementById('resNet').innerText = Math.round(netProfit).toLocaleString() + "원";
+        document.getElementById('resAnnualROI').innerText = annualROI.toFixed(2) + "%";
+
+        // 역계산 모드에서 추가 정보 표시
+        if (isTargetNetMode) {
+            rows = `<tr class="row-group" style="background:#fff3e0;"><td colspan="2">📌 역계산 결과</td></tr>` +
+                   `<tr style="background:#fff8e1;"><td>목표 실수령액</td><td style="color:var(--orange); font-weight:bold;">${Math.round(inputValue).toLocaleString()}원</td></tr>` +
+                   `<tr style="background:#fff8e1;"><td>필요 시세차익</td><td>${Math.round(requiredProfit).toLocaleString()}원</td></tr>` +
+                   `<tr style="background:#fff8e1;"><td>목표 매도가</td><td style="color:#e91e63; font-weight:bold;">${Math.round(requiredSalePrice).toLocaleString()}원</td></tr>` + rows;
+        }
+
+        // 금융 비용 (대출이자) 추가
+        if (interest > 0) {
+            const isExemptVal = document.getElementById('isExempt').value === 'y';
+            const finSectionNum = (currentInvestType === 'realestate' && !isExemptVal) ? 3 : 2;
+            rows += `<tr class="row-group"><td colspan="2">${finSectionNum}. 금융 비용</td></tr>`;
+            rows += `<tr><td>총 대출 이자 (${period}년)</td><td>${Math.round(interest).toLocaleString()}원</td></tr>`;
+        }
+
+        document.getElementById('tableBody').innerHTML = rows;
+        document.getElementById('roiHeader').style.display = 'block';
+        document.getElementById('analysisTable').style.display = 'table';
+    }
+</script>
+</body>
+</html>

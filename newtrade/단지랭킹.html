@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>단지랭킹 - 지역별 타입별 최고가 단지</title>
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-75SPDY6N8V"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-75SPDY6N8V');
+  </script>
+
+  <style>
+    :root{
+      --bg:#0b0c10; --card:#151822; --text:#e8eaf0; --muted:#96a0b5;
+      --accent:#4caf50; --accent-weak:#3a8f40; --tab:rgba(255,255,255,.06);
+      --tab-active:linear-gradient(180deg, rgba(76,175,80,.18), rgba(76,175,80,.06));
+      --ring:rgba(76,175,80,.35);
+      --type84:#fbbf24; --type59:#8b5cf6;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",Arial,sans-serif;
+      background:linear-gradient(180deg,#0b0c10 0%,#0f1220 100%); color:var(--text);
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter:saturate(150%) blur(8px);
+      background:rgba(11,12,16,.6);
+      border-bottom:1px solid rgba(255,255,255,.06)
+    }
+    .wrap{max-width:1080px; margin:0 auto; padding:18px 16px}
+    h1{margin:0; font-size:clamp(24px, 3.5vw, 32px); letter-spacing:-.3px; font-weight:800}
+    .sub{color:var(--muted); font-size:14px; margin-top:6px}
+
+    .header-top{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:4px}
+
+    /* 뒤로가기 버튼 */
+    .back-btn{
+      display:inline-flex; align-items:center; gap:8px; padding:10px 16px;
+      background:var(--tab); border:1px solid rgba(255,255,255,.06);
+      border-radius:10px; color:var(--text); text-decoration:none;
+      font-size:14px; font-weight:600; transition:all .2s ease;
+    }
+    .back-btn:hover{
+      background:var(--tab-active);
+      transform:translateX(-4px);
+      border-color:var(--accent-weak);
+    }
+
+    /* 지역 섹션 */
+    .region-section{
+      margin-top:32px;
+    }
+
+    .region-title{
+      font-size:20px;
+      font-weight:700;
+      color:var(--text);
+      margin:0 0 16px 0;
+      padding-bottom:8px;
+      border-bottom:2px solid rgba(76,175,80,.3);
+    }
+
+    /* 블럭 카드 그리드 */
+    .block-grid{
+      display:grid;
+      grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));
+      gap:16px;
+      margin-bottom:32px;
+    }
+
+    .block-card{
+      background:var(--card);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:14px;
+      padding:24px 20px;
+      cursor:pointer;
+      transition:all .3s ease;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .block-card::before{
+      content:'';
+      position:absolute;
+      top:0; left:0; right:0; bottom:0;
+      opacity:0;
+      transition:opacity .3s ease;
+    }
+
+    .block-card.type-84::before{
+      background:linear-gradient(135deg, rgba(251,191,36,.1) 0%, rgba(251,191,36,.02) 100%);
+    }
+
+    .block-card.type-59::before{
+      background:linear-gradient(135deg, rgba(139,92,246,.1) 0%, rgba(139,92,246,.02) 100%);
+    }
+
+    .block-card.type-volume::before{
+      background:linear-gradient(135deg, rgba(34,197,94,.1) 0%, rgba(34,197,94,.02) 100%);
+    }
+
+    .block-card:hover{
+      transform:translateY(-6px);
+      box-shadow:0 10px 35px rgba(0,0,0,.3);
+    }
+
+    .block-card.type-84:hover{
+      border-color:rgba(251,191,36,.5);
+      box-shadow:0 10px 35px rgba(251,191,36,.2);
+    }
+
+    .block-card.type-59:hover{
+      border-color:rgba(139,92,246,.5);
+      box-shadow:0 10px 35px rgba(139,92,246,.2);
+    }
+
+    .block-card.type-volume:hover{
+      border-color:rgba(34,197,94,.5);
+      box-shadow:0 10px 35px rgba(34,197,94,.2);
+    }
+
+    .block-card:hover::before{
+      opacity:1;
+    }
+
+    .block-badge{
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      padding:6px 12px;
+      border-radius:999px;
+      font-size:13px;
+      font-weight:700;
+      margin-bottom:12px;
+    }
+
+    .block-badge.type-84{
+      background:linear-gradient(135deg,#fbbf24,#f59e0b);
+      color:#fff;
+      box-shadow:0 2px 8px rgba(251,191,36,.3);
+    }
+
+    .block-badge.type-59{
+      background:linear-gradient(135deg,#8b5cf6,#7c3aed);
+      color:#fff;
+      box-shadow:0 2px 8px rgba(139,92,246,.3);
+    }
+
+    .block-badge.type-volume{
+      background:linear-gradient(135deg,#22c55e,#16a34a);
+      color:#fff;
+      box-shadow:0 2px 8px rgba(34,197,94,.3);
+    }
+
+    .block-title{
+      font-size:20px;
+      font-weight:800;
+      margin:0 0 6px 0;
+      color:var(--text);
+      position:relative;
+      z-index:1;
+    }
+
+    .block-desc{
+      color:var(--muted);
+      font-size:13px;
+      line-height:1.5;
+      margin:0;
+      position:relative;
+      z-index:1;
+    }
+
+    footer.page{
+      border-top:1px solid rgba(255,255,255,.06);
+      text-align:center;
+      color:var(--muted);
+      font-size:13px;
+      padding:28px 0 36px;
+      margin-top:24px;
+    }
+    footer.page a{color:#cfe6ff; text-decoration:none}
+
+    @media (max-width:640px){
+      .block-grid{
+        grid-template-columns:1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <a href="index.html" class="back-btn">← 메인으로</a>
+      <div class="header-top" style="margin-top:12px">
+        <div>
+          <h1>단지랭킹</h1>
+          <div class="sub">지역별·타입별 최고가 단지 순위</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- 서울 & 수도권 -->
+    <section class="region-section">
+      <h2 class="region-title">🏙️ 서울 & 수도권</h2>
+      <div class="block-grid">
+        <div class="block-card type-84" onclick="location.href='서울&수도권 84 순위.html'">
+          <div class="block-badge type-84">84㎡</div>
+          <h3 class="block-title">서울 & 수도권 84㎡</h3>
+          <p class="block-desc">서울·경기·인천 지역 84㎡ 타입 최고가 순위</p>
+        </div>
+
+        <div class="block-card type-59" onclick="location.href='서울&수도권 59 순위.html'">
+          <div class="block-badge type-59">59㎡</div>
+          <h3 class="block-title">서울 & 수도권 59㎡</h3>
+          <p class="block-desc">서울·경기·인천 지역 59㎡ 타입 최고가 순위</p>
+        </div>
+
+        <div class="block-card type-volume" onclick="location.href='서울수도권거래량.html'">
+          <div class="block-badge type-volume">거래량</div>
+          <h3 class="block-title">서울 & 수도권 거래량</h3>
+          <p class="block-desc">서울·경기·인천 지역 연도별 거래량 통계</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 대구 -->
+    <section class="region-section">
+      <h2 class="region-title">🌆 대구</h2>
+      <div class="block-grid">
+        <div class="block-card type-84" onclick="location.href='대구 84 순위.html'">
+          <div class="block-badge type-84">84㎡</div>
+          <h3 class="block-title">대구 84㎡</h3>
+          <p class="block-desc">대구 지역 84㎡ 타입 최고가 순위</p>
+        </div>
+
+        <div class="block-card type-59" onclick="location.href='대구 59 순위.html'">
+          <div class="block-badge type-59">59㎡</div>
+          <h3 class="block-title">대구 59㎡</h3>
+          <p class="block-desc">대구 지역 59㎡ 타입 최고가 순위</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 부산 -->
+    <section class="region-section">
+      <h2 class="region-title">🌊 부산</h2>
+      <div class="block-grid">
+        <div class="block-card type-84" onclick="location.href='부산 84 순위.html'">
+          <div class="block-badge type-84">84㎡</div>
+          <h3 class="block-title">부산 84㎡</h3>
+          <p class="block-desc">부산 지역 84㎡ 타입 최고가 순위</p>
+        </div>
+
+        <div class="block-card type-59" onclick="location.href='부산 59 순위.html'">
+          <div class="block-badge type-59">59㎡</div>
+          <h3 class="block-title">부산 59㎡</h3>
+          <p class="block-desc">부산 지역 59㎡ 타입 최고가 순위</p>
+        </div>
+      </div>
+    </section>
+
+    <footer class="page">
+      <div><strong>협업 및 수정 문의</strong> · <a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">https://litt.ly/richdadtechtree</a></div>
+    </footer>
+  </main>
+</body>
+</html>

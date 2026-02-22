@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>부태리의 부동산 매수 경비 계산기 (r7 - 중개수수료 추가)</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 920px; margin: auto; padding: 20px; line-height: 1.55; }
+    h1 { margin-bottom: 6px; }
+    .muted { color: #666; font-size: 12px; }
+    label { display: block; margin-top: 12px; font-weight: 700; }
+    input { width: 100%; padding: 10px; margin-top: 6px; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+    input[readonly] { background: #fafafa; }
+    table { margin: 18px 0; border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #e6e6e6; padding: 10px; text-align: right; }
+    th { background: #f7f7f7; }
+    td:first-child, th:first-child { text-align: left; }
+    .note { background: #fef6e7; border: 1px solid #f6e0a6; padding: 10px 12px; border-radius: 10px; font-size: 13px; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background:#f6f8fa; border:1px solid #e1e4e8; padding: 2px 6px; border-radius: 6px; font-size: 12px; }
+    .pill { display:inline-block; padding:2px 8px; border-radius:999px; background:#eef6ff; border:1px solid #d4e7ff; color:#2762e7; font-size:12px; }
+    .total { font-weight: 800; font-size: 18px; }
+  </style>
+</head>
+<body>
+  <h1>부태리의 부동산 매수 경비 계산기</h1>
+  <div class="muted">정책 가정: <strong>무주택자 · 주택 · 전용 85㎡ 미만</strong> → 농어촌특별세 0 · 주택 계약서 인지대 적용 (버전: 2025-08-27)</div>
+
+  <section>
+    <label>취득가 (원)
+      <input type="text" id="취득가" placeholder="예: 500,000,000" oninput="formatNumber(this); updateAll();"/>
+      <div id="취득가_text" style="margin-top:4px; font-size:13px; color:#333;"></div>
+    </label>
+  </section>
+
+  <section class="note" style="margin-top:14px;">
+    취득세율: <span class="code">6억 이하 1%</span>, <span class="code">6억~9억 구간 1%→3% 선형</span>, <span class="code">9억 초과 3%</span>.<br/>
+    지방교육세는 취득세의 <span class="code">10%</span>. 농특세 0. 인지대는 주택 계약서(1억 이하 면제) 기준. <br/>
+    <strong>중개수수료</strong>는 초기 버전 산정식을 복구하여 <u>법무사 법정수수료 아래</u>에 표기하고, 총합에도 포함했습니다.
+  </section>
+
+  <section>
+    <h3>항목별 산출 결과</h3>
+    <table>
+      <thead>
+        <tr><th>항목</th><th>금액(원)</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>취득세</td><td id="취득세_cell">0원</td></tr>
+        <tr><td>지방교육세</td><td id="지방교육세_cell">0원</td></tr>
+        <tr><td>농어촌특별세</td><td id="농특세_cell">0원</td></tr>
+        <tr><td>인지대</td><td id="인지대_cell">0원</td></tr>
+        <tr><td>증지대</td><td id="증지대_cell">0원</td></tr>
+        <tr><td>법무사 법정수수료</td><td id="법정수수료_cell">0원</td></tr>
+        <tr><td>부동산 중개수수료(매수)</td><td id="중개수수료_cell">0원</td></tr>
+      </tbody>
+      <tfoot>
+        <tr><th>합계(취득세 및 각종 경비)</th><th id="경비합계_cell">0원</th></tr>
+        <tr><th class="total">총 필요 자금 (취득가 + 경비)</th><th id="총합_cell" class="total">0원</th></tr>
+      </tfoot>
+    </table>
+    <div class="muted">적용 취득세율: <span id="취득세율">0%</span>  ·  지방교육세율: <span id="지방교육세율">0%</span></div>
+  </section>
+
+  <script>
+    // --- 숫자 포맷 & 한글 변환 ---
+    function formatNumber(input) {
+      const raw = input.value.replace(/,/g, '').replace(/[^0-9]/g, '');
+      input.value = raw === '' ? '' : Number(raw).toLocaleString('ko-KR');
+      const v = parseInt(raw || '0', 10);
+      document.getElementById('취득가_text').textContent = v ? (numberToKorean(v) + '원') : '';
+    }
+    function numberToKorean(num) {
+      const hanA = ['', '일','이','삼','사','오','육','칠','팔','구'];
+      const unitA = ['','십','백','천'];
+      const bigUnitA = ['','만','억','조','경'];
+      if (num === 0) return '영';
+      let result = '';
+      const str = String(num);
+      let groupCount = 0;
+      for (let i = str.length; i > 0; i -= 4) {
+        let part = str.substring(Math.max(0, i-4), i);
+        let partNum = parseInt(part,10);
+        if (partNum>0) {
+          let section = '';
+          for (let j=0;j<part.length;j++){
+            const digit = parseInt(part[j]);
+            const pos = part.length-j-1;
+            if(digit>0) section+=hanA[digit]+unitA[pos];
+          }
+          result = section+bigUnitA[groupCount]+(result?' '+result:'');
+        }
+        groupCount++;
+      }
+      return result.trim();
+    }
+    function parsePrice() {
+      const v = (document.getElementById('취득가').value || '').replace(/,/g,'');
+      return parseInt(v, 10) || 0;
+    }
+    function setCell(id, val) {
+      const el = document.getElementById(id);
+      el.textContent = (val||0).toLocaleString('ko-KR') + '원';
+    }
+
+    // --- 취득세율(%) 계산: 구간식 ---
+    function getAcquisitionRatePercent(price) {
+      if (price <= 0) return 0;
+      const x = price / 100_000_000; // 억 단위
+      if (x <= 6) return 1;          // 6억 이하: 1%
+      if (x >= 9) return 3;          // 9억 초과: 3%
+      // 6 < x < 9: 1% → 3% 선형
+      return 1 + ( (x - 6) * (2/3) );
+    }
+
+    // --- 산출식 ---
+    function calcAcquisitionTax(price) {
+      if (price <= 0) return 0;
+      const ratePercent = getAcquisitionRatePercent(price);
+      const rate = ratePercent / 100;
+      return Math.round(price * rate);
+    }
+
+    // 지방교육세: 취득세의 10%
+    function calcLocalEduTax(acqTax) {
+      return Math.round(acqTax * 0.10);
+    }
+
+    // 농어촌특별세: 무주택·85㎡ 미만 → 0
+    function calcRuralSpecialTax() { return 0; }
+
+    // 인지대 (주택 계약서 기준: 1억 이하 면제, 1억~10억 15만, 10억 초과 35만)
+    function calcStampTax(price) {
+      if (price <= 100_000_000) return 0;
+      if (price <= 1_000_000_000) return 150_000;
+      return 350_000;
+    }
+
+    // 증지대 (서면신청 기준): 18,000원 고정
+    function calcDocumentStamp(price) {
+      if (price <= 0) return 0;
+      return 18_000;
+    }
+
+    // 법무사 법정수수료 (상한)
+    function calcLegalAgentFee(base) {
+      if (base <= 0) return 0;
+      let fee = 0;
+      if (base <= 50_000_000) {
+        fee = 210_000;
+      } else if (base <= 100_000_000) {
+        fee = 210_000 + (base - 50_000_000) * 0.001;
+      } else if (base <= 300_000_000) {
+        fee = 260_000 + (base - 100_000_000) * 0.0009;
+      } else if (base <= 500_000_000) {
+        fee = 440_000 + (base - 300_000_000) * 0.0008;
+      } else if (base <= 1_000_000_000) {
+        fee = 600_000 + (base - 500_000_000) * 0.0007;
+      } else if (base <= 2_000_000_000) {
+        fee = 950_000 + (base - 1_000_000_000) * 0.0005;
+      } else if (base <= 20_000_000_000) {
+        fee = 1_450_000 + (base - 2_000_000_000) * 0.0004;
+      } else {
+        fee = 8_650_000 + (base - 20_000_000_000) * 0.0001;
+      }
+      return Math.round(fee);
+    }
+
+    // 부동산 중개수수료(매수) – 초기 버전 산식 복구
+    function calcBrokerage(price) {
+      if (price <= 0) return 0;
+      let rate = 0, cap = Infinity;
+      if (price < 50_000_000) { rate = 0.006; cap = 250_000; }
+      else if (price < 200_000_000) { rate = 0.005; cap = 800_000; }
+      else if (price < 900_000_000) { rate = 0.004; }
+      else if (price < 1_200_000_000) { rate = 0.005; }
+      else if (price < 1_500_000_000) { rate = 0.006; }
+      else { rate = 0.007; }
+      let fee = price * rate;
+      if (fee > cap) fee = cap;
+      return Math.round(fee);
+    }
+
+    // --- 메인 업데이트 ---
+    function updateAll() {
+      const price = parsePrice();
+
+      const acqRatePercent = getAcquisitionRatePercent(price);
+      const acqTax = calcAcquisitionTax(price);
+      const eduTax = calcLocalEduTax(acqTax);
+      const ruralTax = calcRuralSpecialTax();
+      const stamp = calcStampTax(price);
+      const docStamp = calcDocumentStamp(price);
+      const legalFee = calcLegalAgentFee(price);
+      const brokerage = calcBrokerage(price);
+
+      // 세율 표시
+      document.getElementById('취득세율').textContent = acqRatePercent.toFixed(2) + '%';
+      document.getElementById('지방교육세율').textContent = (acqRatePercent * 0.1).toFixed(2) + '%';
+
+      // 금액 셀
+      setCell('취득세_cell', acqTax);
+      setCell('지방교육세_cell', eduTax);
+      setCell('농특세_cell', ruralTax);
+      setCell('인지대_cell', stamp);
+      setCell('증지대_cell', docStamp);
+      setCell('법정수수료_cell', legalFee);
+      setCell('중개수수료_cell', brokerage);
+
+      const expenseSum = acqTax + eduTax + ruralTax + stamp + docStamp + legalFee + brokerage;
+      setCell('경비합계_cell', expenseSum);
+
+      const total = price + expenseSum;
+      setCell('총합_cell', total);
+    }
+
+    // 초기 표시
+    updateAll();
+  </script>
+<div style="margin-top:24px; padding-top:12px; border-top:1px solid #e6e6e6; font-size:14px; text-align:center;">
+  <strong>협업 및 수정 문의</strong><br>
+  <a href="https://litt.ly/richdadtechtree" target="_blank" rel="noopener">
+    https://litt.ly/richdadtechtree
+  </a>
+</div>
+</body>
+</html>

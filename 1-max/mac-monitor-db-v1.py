@@ -1122,6 +1122,29 @@ class RealEstateMonitorApp:
                 'latest_date': latest_date
             }
 
+            # ── 지역별 기간별 증감율 (클릭 시 막대그래프용) ──
+            all_top3_regions = set()
+            for lst in [result['weekly_top3'], result['month3_top3'],
+                        result['month6_top3'], result['year1_top3']]:
+                for region_name, _ in lst:
+                    all_top3_regions.add(region_name)
+
+            def get_col_sum(col_idx, n_rows):
+                target = data_rows[-n_rows:] if len(data_rows) >= n_rows else data_rows
+                return sum(row[1][col_idx] for row in target if col_idx < len(row[1]))
+
+            region_chart_data = {}
+            for i, h in enumerate(headers):
+                if h and h in all_top3_regions and i not in exclude_cols:
+                    val_weekly = latest_values[i] if i < len(latest_values) else 0
+                    region_chart_data[h] = {
+                        '1주':   round(float(val_weekly), 2),
+                        '3개월': round(float(get_col_sum(i, 13)), 2),
+                        '6개월': round(float(get_col_sum(i, 26)), 2),
+                        '1년':   round(float(get_col_sum(i, 52)), 2),
+                    }
+            result['region_chart_data'] = region_chart_data
+
             logging.info(f"[KB 엑셀 분석] 최신 날짜: {latest_date}, "
                          f"주간 TOP3: {result['weekly_top3']}")
             return result
@@ -8680,18 +8703,51 @@ class RealEstateMonitorApp:
 
         return html_content
 
-    def _get_newtrade_filename(self):
-        """현재 활성 리스트 이름에 따른 newtrade 신고가 HTML 파일명 반환"""
+    def _get_newtrade_filename(self, apt_list=None):
+        """현재 활성 리스트 이름(또는 apt_list의 sido 정보)에 따른 HTML 파일명 반환"""
         list_name = self.active_list.get() if hasattr(self, 'active_list') else ""
+
+        # 리스트명 → 파일명 매핑
         name_map = {
             "서울 수도권": "서울&수도권 신고가.html",
-            "대구": "대구신고가.html",
-            "부산": "부산신고가.html",
+            "대구":        "대구신고가.html",
+            "부산":        "부산신고가.html",
+            "대전":        "대전신고가.html",
+            "광주":        "광주신고가.html",
+            "울산":        "울산신고가.html",
         }
         if list_name in name_map:
             return name_map[list_name]
-        # 매핑에 없는 리스트는 리스트명+신고가.html
-        safe_name = list_name.replace(" ", "_") if list_name else "기본"
+
+        # ★ 전체 통합 or 매핑 없는 리스트: apt_list의 sido로 지역 판별
+        if apt_list:
+            sido_set = set()
+            for apt in apt_list:
+                s = apt.get("sido", "")
+                if s:
+                    sido_set.add(s)
+            # 서울/경기/인천이 하나라도 있으면 수도권
+            if sido_set & {"서울", "경기", "인천"}:
+                return "서울&수도권 신고가.html"
+            if "대구" in sido_set:
+                return "대구신고가.html"
+            if "부산" in sido_set:
+                return "부산신고가.html"
+            if "대전" in sido_set:
+                return "대전신고가.html"
+            if "광주" in sido_set:
+                return "광주신고가.html"
+            if "울산" in sido_set:
+                return "울산신고가.html"
+            # 단일 시도면 그 이름 사용
+            if len(sido_set) == 1:
+                safe = list(sido_set)[0].replace(" ", "_")
+                return f"{safe}신고가.html"
+
+        # 폴백: 리스트명 기반
+        safe_name = list_name.replace(" ", "_").replace("★", "").strip("_") if list_name else "기본"
+        if not safe_name:
+            safe_name = "기본"
         return f"{safe_name}신고가.html"
 
     def export_notification_html(self, apt_list, *, ask_path=False, silent=False, fixed_filename=None):
@@ -8726,7 +8782,7 @@ class RealEstateMonitorApp:
                 newtrade_dir = os.path.join(self.html_download_path, "newtrade")
                 os.makedirs(newtrade_dir, exist_ok=True)
 
-                filename = fixed_filename or self._get_newtrade_filename()
+                filename = fixed_filename or self._get_newtrade_filename(apt_list)
                 filepath = os.path.join(newtrade_dir, filename)
 
                 # 기존 파일이 있으면 backup 폴더로 이동
@@ -9641,17 +9697,19 @@ class RealEstateMonitorApp:
             def render_items(items):
                 html = ''
                 for i, (region, val) in enumerate(items):
-                    html += f'''<div class="kb-card-item">
+                    html += f'''<div class="kb-card-item" onclick="showRegionChart(\'{escape(region)}\')" style="cursor:pointer;" title="{escape(region)} 기간별 증감율 보기">
                       <span class="rank">{medals[i]}</span>
                       <span class="region">{escape(region)}</span>
                       <span class="value">{val:+.2f}%</span>
                     </div>'''
                 return html
 
+            import json as _json
             kb_date = kb_analysis.get('latest_date', '')
+            region_chart_json = _json.dumps(kb_analysis.get('region_chart_data', {}), ensure_ascii=False)
             kb_analysis_html = f'''
     <div class="kb-analysis-section">
-      <div class="kb-analysis-title">📊 KB 매매증감 분석 ({escape(kb_date)} 기준)</div>
+      <div class="kb-analysis-title">📊 KB 매매증감 분석 ({escape(kb_date)} 기준) <small style="font-size:0.7em;opacity:0.7">지역명 클릭 시 기간별 증감 차트</small></div>
       <div class="kb-analysis-grid">
         <div class="kb-card weekly">
           <div class="kb-card-label">🏆 최근 최고상승률 TOP3</div>
@@ -9670,7 +9728,8 @@ class RealEstateMonitorApp:
           {render_items(kb_analysis.get('year1_top3', []))}
         </div>
       </div>
-    </div>'''
+    </div>
+    <script>const kbRegionChartData = {region_chart_json};</script>'''
 
         html_content = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -10764,6 +10823,70 @@ function closeTierModal() {{
 </body>
 </html>"""
 
+        html_content = html_content.replace('</body>', '''
+<!-- ── KB 지역별 기간 증감 차트 모달 ── -->
+<div id="regionChartModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:#1e1e2f;border-radius:16px;padding:28px;min-width:340px;max-width:90vw;width:420px;position:relative;">
+    <button onclick="closeRegionChart()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#aaa;font-size:1.4em;cursor:pointer;">✕</button>
+    <h3 id="regionChartTitle" style="color:#e0e0e8;margin:0 0 18px;font-size:1.1em;text-align:center;"></h3>
+    <canvas id="regionBarCanvas" height="220"></canvas>
+  </div>
+</div>
+<script>
+let _regionBarChart = null;
+function showRegionChart(regionName) {
+  const data = kbRegionChartData[regionName];
+  if (!data) { alert(regionName + ' 데이터가 없습니다.'); return; }
+  const labels = ['1주', '3개월', '6개월', '1년'];
+  const values = [data['1주'], data['3개월'], data['6개월'], data['1년']];
+  const colors = values.map(v => v >= 0 ? 'rgba(58,166,255,0.85)' : 'rgba(231,76,60,0.85)');
+  document.getElementById('regionChartTitle').textContent = '📊 ' + regionName + ' 기간별 누적 증감율';
+  const modal = document.getElementById('regionChartModal');
+  modal.style.display = 'flex';
+  const ctx = document.getElementById('regionBarCanvas').getContext('2d');
+  if (_regionBarChart) { _regionBarChart.destroy(); }
+  _regionBarChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '증감율 (%)',
+        data: values,
+        backgroundColor: colors,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%'
+          }
+        }
+      },
+      scales: {
+        y: {
+          grid: { color: 'rgba(255,255,255,0.1)' },
+          ticks: {
+            color: '#a0a0a8',
+            callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
+          }
+        },
+        x: { grid: { display: false }, ticks: { color: '#e0e0e8' } }
+      }
+    }
+  });
+}
+function closeRegionChart() {
+  document.getElementById('regionChartModal').style.display = 'none';
+}
+document.getElementById('regionChartModal').addEventListener('click', function(e) {
+  if (e.target === this) closeRegionChart();
+});
+</script>
+</body>''', 1)
         return html_content
 
     def export_fear_greed_html(self):
@@ -12463,7 +12586,7 @@ function closeTierModal() {{
             return
 
         # 파일명을 지금 확정 (active_list가 나중에 변경될 수 있으므로 미리 캡처)
-        _fixed_filename = self._get_newtrade_filename()
+        _fixed_filename = self._get_newtrade_filename(apt_list)
 
         # 신고가 높은 순으로 정렬
         apt_list = sorted(apt_list, key=lambda x: x.get('new_price', 0), reverse=True)
@@ -12935,7 +13058,8 @@ function closeTierModal() {{
 
         def gen_html(list_name, apt_list):
             self.active_list.set(list_name)
-            self.export_notification_html(apt_list, ask_path=False, silent=False)
+            fn = self._get_newtrade_filename(apt_list)
+            self.export_notification_html(apt_list, ask_path=False, silent=False, fixed_filename=fn)
 
         for list_name, apt_list in regional_results:
             if "서울" in list_name or "수도권" in list_name:
@@ -12959,7 +13083,8 @@ function closeTierModal() {{
         def gen_all():
             for list_name, apt_list in regional_results:
                 self.active_list.set(list_name)
-                self.export_notification_html(apt_list, ask_path=False, silent=True)
+                fn = self._get_newtrade_filename(apt_list)
+                self.export_notification_html(apt_list, ask_path=False, silent=True, fixed_filename=fn)
             self.active_list.set(prev_list)
             messagebox.showinfo("완료", f"{len(regional_results)}개 지역 HTML 생성 완료")
 

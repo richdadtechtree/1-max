@@ -9738,6 +9738,8 @@ class RealEstateMonitorApp:
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>부태리의 부동산 신고가 & 단지랭킹</title>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+
 <!-- Google tag (gtag.js) -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-75SPDY6N8V"></script>
 <script>

@@ -1145,6 +1145,18 @@ class RealEstateMonitorApp:
                     }
             result['region_chart_data'] = region_chart_data
 
+            # 전체 지역 연간 데이터 (클릭 시 주간/월간/연간 차트용)
+            kb_annual_data = {}
+            for i, h in enumerate(headers):
+                if h and i not in exclude_cols:
+                    series = [
+                        [date_str, round(float(vals[i]) if i < len(vals) else 0.0, 4)]
+                        for date_str, vals in data_rows
+                    ]
+                    if series:
+                        kb_annual_data[h] = series
+            result['kb_annual_data'] = kb_annual_data
+
             logging.info(f"[KB 엑셀 분석] 최신 날짜: {latest_date}, "
                          f"주간 TOP3: {result['weekly_top3']}")
             return result
@@ -9697,16 +9709,16 @@ class RealEstateMonitorApp:
             def render_items(items):
                 html = ''
                 for i, (region, val) in enumerate(items):
-                    html += f'''<div class="kb-card-item" onclick="showRegionChart(\'{escape(region)}\')" style="cursor:pointer;" title="{escape(region)} 기간별 증감율 보기">
+                    html += f'''<div class="kb-card-item">
                       <span class="rank">{medals[i]}</span>
-                      <span class="region">{escape(region)}</span>
+                      <span class="region kb-region-link" onclick="showRegionChart(this.textContent.trim())">{escape(region)}</span>
                       <span class="value">{val:+.2f}%</span>
                     </div>'''
                 return html
 
             import json as _json
             kb_date = kb_analysis.get('latest_date', '')
-            region_chart_json = _json.dumps(kb_analysis.get('region_chart_data', {}), ensure_ascii=False)
+            kb_annual_data_json = _json.dumps(kb_analysis.get('kb_annual_data', {}), ensure_ascii=False)
             kb_analysis_html = f'''
     <div class="kb-analysis-section">
       <div class="kb-analysis-title">📊 KB 매매증감 분석 ({escape(kb_date)} 기준) <small style="font-size:0.7em;opacity:0.7">지역명 클릭 시 기간별 증감 차트</small></div>
@@ -9729,7 +9741,7 @@ class RealEstateMonitorApp:
         </div>
       </div>
     </div>
-    <script>const kbRegionChartData = {region_chart_json};</script>'''
+    <script>const KB_ANNUAL_DATA = {kb_annual_data_json};</script>'''
 
         html_content = f"""<!DOCTYPE html>
 <html lang="ko">
@@ -10319,6 +10331,91 @@ class RealEstateMonitorApp:
   }}
   footer.page a{{color:#cfe6ff; text-decoration:none}}
 
+  /* KB 지역 차트 팝업 */
+  .kb-region-link {{
+    cursor: pointer;
+    text-decoration: underline dotted rgba(255,255,255,0.4);
+    transition: color 0.2s;
+  }}
+  .kb-region-link:hover {{
+    color: #FFD700 !important;
+    text-decoration: underline solid;
+  }}
+  .chart-modal-overlay {{
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }}
+  .chart-modal-overlay.show {{ display: flex; }}
+  .chart-modal {{
+    background: #1a1b2e;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 20px;
+    padding: 28px;
+    width: min(680px, 95vw);
+    position: relative;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7);
+  }}
+  .chart-modal-header {{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }}
+  .chart-modal-title {{
+    font-size: 17px;
+    font-weight: 800;
+    color: #fff;
+  }}
+  .chart-modal-close {{
+    background: rgba(255,255,255,0.1);
+    border: none;
+    color: #fff;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+  }}
+  .chart-modal-close:hover {{ background: rgba(255,255,255,0.22); }}
+  .chart-modal-subtitle {{
+    font-size: 12px;
+    color: rgba(255,255,255,0.5);
+    margin-bottom: 14px;
+    text-align: center;
+  }}
+  .chart-tabs {{
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }}
+  .chart-tab-btn {{
+    flex: 1;
+    padding: 8px 0;
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.06);
+    color: rgba(255,255,255,0.7);
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.2s;
+  }}
+  .chart-tab-btn.active {{
+    background: rgba(76,175,80,0.22);
+    border-color: #4caf50;
+    color: #fff;
+  }}
+  .chart-tab-btn:hover:not(.active) {{
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+  }}
+
   /* 티어 상세 모달 */
   .tier-modal-overlay {{
     display:none;
@@ -10471,7 +10568,7 @@ class RealEstateMonitorApp:
     {f'''<div class="hotplace-section">
       <div class="hotplace-card">
         <div class="hotplace-label">🏆 이번주 핫플레이스 (KB 주간 상승률 TOP)</div>
-        <div class="hotplace-region">{escape(hotplace_region)}</div>
+        <div class="hotplace-region kb-region-link" onclick="showRegionChart(this.textContent.trim())">{escape(hotplace_region)}</div>
         <div class="hotplace-rate">+{escape(hotplace_rate)}%</div>
       </div>
     </div>''' if hotplace_region else ''}
@@ -10826,67 +10923,139 @@ function closeTierModal() {{
 </html>"""
 
         html_content = html_content.replace('</body>', '''
-<!-- ── KB 지역별 기간 증감 차트 모달 ── -->
-<div id="regionChartModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:#1e1e2f;border-radius:16px;padding:28px;min-width:340px;max-width:90vw;width:420px;position:relative;">
-    <button onclick="closeRegionChart()" style="position:absolute;top:12px;right:16px;background:none;border:none;color:#aaa;font-size:1.4em;cursor:pointer;">✕</button>
-    <h3 id="regionChartTitle" style="color:#e0e0e8;margin:0 0 18px;font-size:1.1em;text-align:center;"></h3>
-    <canvas id="regionBarCanvas" height="220"></canvas>
+<!-- KB 지역 연간 차트 팝업 모달 -->
+<div id="chartModal" class="chart-modal-overlay" onclick="if(event.target===this)closeChartModal()">
+  <div class="chart-modal">
+    <div class="chart-modal-header">
+      <span class="chart-modal-title" id="chartModalTitle">지역 차트</span>
+      <button class="chart-modal-close" onclick="closeChartModal()">✕</button>
+    </div>
+    <div class="chart-tabs">
+      <button class="chart-tab-btn active" data-tab="weekly"  onclick="switchChartTab(\'weekly\')">주간 (52주)</button>
+      <button class="chart-tab-btn"        data-tab="monthly" onclick="switchChartTab(\'monthly\')">월간</button>
+      <button class="chart-tab-btn"        data-tab="yearly"  onclick="switchChartTab(\'yearly\')">연간</button>
+    </div>
+    <div class="chart-modal-subtitle" id="chartModalSubtitle"></div>
+    <canvas id="regionChart" style="max-height:420px;"></canvas>
   </div>
 </div>
 <script>
-let _regionBarChart = null;
-function showRegionChart(regionName) {
-  const data = kbRegionChartData[regionName];
-  if (!data) { alert(regionName + ' 데이터가 없습니다.'); return; }
-  const labels = ['1주', '3개월', '6개월', '1년'];
-  const values = [data['1주'], data['3개월'], data['6개월'], data['1년']];
-  const colors = values.map(v => v >= 0 ? 'rgba(58,166,255,0.85)' : 'rgba(231,76,60,0.85)');
-  document.getElementById('regionChartTitle').textContent = '📊 ' + regionName + ' 기간별 누적 증감율';
-  const modal = document.getElementById('regionChartModal');
-  modal.style.display = 'flex';
-  const ctx = document.getElementById('regionBarCanvas').getContext('2d');
-  if (_regionBarChart) { _regionBarChart.destroy(); }
-  _regionBarChart = new Chart(ctx, {
-    type: 'bar',
+var regionChartInstance = null;
+var currentChartRegion = \'\';
+var currentChartTab = \'weekly\';
+
+function aggregateWeekly(data) {
+  var slice = data.slice(-52);
+  return [slice.map(function(d) { return d[0]; }), slice.map(function(d) { return d[1]; })];
+}
+function aggregateMonthly(data) {
+  var map = {}, keys = [];
+  data.forEach(function(d) {
+    var m = d[0].substring(0, 7);
+    if (!map[m]) { map[m] = 0; keys.push(m); }
+    map[m] += d[1];
+  });
+  keys.sort();
+  return [keys, keys.map(function(k) { return Math.round(map[k] * 100) / 100; })];
+}
+function aggregateYearly(data) {
+  var map = {}, keys = [];
+  data.forEach(function(d) {
+    var y = d[0].substring(0, 4);
+    if (!map[y]) { map[y] = 0; keys.push(y); }
+    map[y] += d[1];
+  });
+  keys.sort();
+  return [keys, keys.map(function(k) { return Math.round(map[k] * 100) / 100; })];
+}
+function renderRegionChart(regionName, tab) {
+  var annualData = (typeof KB_ANNUAL_DATA !== \'undefined\') ? KB_ANNUAL_DATA : {};
+  var raw = annualData[regionName];
+  if (!raw || raw.length === 0) { return; }
+  var labels, values;
+  if (tab === \'monthly\') {
+    var r = aggregateMonthly(raw); labels = r[0]; values = r[1];
+  } else if (tab === \'yearly\') {
+    var r = aggregateYearly(raw); labels = r[0]; values = r[1];
+  } else {
+    var r = aggregateWeekly(raw); labels = r[0]; values = r[1];
+  }
+  var tabLabels = { weekly: \'주간 (최근 52주)\', monthly: \'월간 누적\', yearly: \'연간 누적\' };
+  var tabUnits  = { weekly: \'주간 증감(%)\', monthly: \'월간 증감 합(%)\', yearly: \'연간 증감 합(%)\' };
+  document.getElementById(\'chartModalTitle\').textContent = \'📊 \' + regionName;
+  document.getElementById(\'chartModalSubtitle\').textContent =
+    tabLabels[tab] + \' KB 매매증감 — 양수 빨강 / 음수 파랑  |  총 \' + labels.length + \'개 항목\';
+  var canvas = document.getElementById(\'regionChart\');
+  var ctx = canvas.getContext(\'2d\');
+  if (regionChartInstance) { regionChartInstance.destroy(); regionChartInstance = null; }
+  var bgColors = values.map(function(v) { return v >= 0 ? \'rgba(244,67,54,0.72)\' : \'rgba(52,152,219,0.72)\'; });
+  var bdColors = values.map(function(v) { return v >= 0 ? \'#f44336\' : \'#3498db\'; });
+  regionChartInstance = new Chart(ctx, {
+    type: \'bar\',
     data: {
       labels: labels,
       datasets: [{
-        label: '증감율 (%)',
+        label: tabUnits[tab],
         data: values,
-        backgroundColor: colors,
-        borderRadius: 6,
+        backgroundColor: bgColors,
+        borderColor: bdColors,
+        borderWidth: 1,
+        borderRadius: 3
       }]
     },
     options: {
       responsive: true,
+      animation: { duration: 350 },
       plugins: {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: ctx => (ctx.parsed.y >= 0 ? '+' : '') + ctx.parsed.y.toFixed(2) + '%'
+            label: function(c) { return (c.parsed.y >= 0 ? \'+\' : \'\') + c.parsed.y.toFixed(2) + \'%\'; }
           }
         }
       },
       scales: {
-        y: {
-          grid: { color: 'rgba(255,255,255,0.1)' },
+        x: {
           ticks: {
-            color: '#a0a0a8',
-            callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%'
-          }
+            color: \'rgba(255,255,255,0.55)\',
+            maxRotation: tab === \'weekly\' ? 60 : 45,
+            font: { size: tab === \'yearly\' ? 13 : 10 },
+            maxTicksLimit: tab === \'yearly\' ? 20 : (tab === \'monthly\' ? 24 : 26)
+          },
+          grid: { color: \'rgba(255,255,255,0.07)\' }
         },
-        x: { grid: { display: false }, ticks: { color: '#e0e0e8' } }
+        y: {
+          ticks: {
+            color: \'rgba(255,255,255,0.65)\',
+            callback: function(v) { return (v >= 0 ? \'+\' : \'\') + v.toFixed(2) + \'%\'; }
+          },
+          grid: { color: \'rgba(255,255,255,0.1)\' }
+        }
       }
     }
   });
 }
-function closeRegionChart() {
-  document.getElementById('regionChartModal').style.display = 'none';
+function showRegionChart(regionName) {
+  var annualData = (typeof KB_ANNUAL_DATA !== \'undefined\') ? KB_ANNUAL_DATA : {};
+  if (!annualData[regionName] || annualData[regionName].length === 0) {
+    alert(regionName + \'의 데이터가 없습니다.\');
+    return;
+  }
+  currentChartRegion = regionName;
+  currentChartTab = \'weekly\';
+  switchChartTab(\'weekly\');
+  document.getElementById(\'chartModal\').classList.add(\'show\');
 }
-document.getElementById('regionChartModal').addEventListener('click', function(e) {
-  if (e.target === this) closeRegionChart();
-});
+function switchChartTab(tab) {
+  currentChartTab = tab;
+  document.querySelectorAll(\'.chart-tab-btn\').forEach(function(btn) {
+    btn.classList.toggle(\'active\', btn.dataset.tab === tab);
+  });
+  renderRegionChart(currentChartRegion, tab);
+}
+function closeChartModal() {
+  document.getElementById(\'chartModal\').classList.remove(\'show\');
+}
 </script>
 </body>''', 1)
         return html_content

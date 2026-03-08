@@ -5288,29 +5288,39 @@ class RealEstateMonitorApp:
         progress_window.protocol("WM_DELETE_WINDOW", _cancel)
         
         def process_recheck():
+            # macOS 스레드 안전 UI 헬퍼
+            def ui_text(msg):
+                m = msg
+                self.root.after(0, lambda: (debug_text.insert('end', m), debug_text.see('end')))
+            def ui_progress(pct, label=None):
+                p, l = pct, label
+                if l:
+                    self.root.after(0, lambda: (progress_bar.configure(value=p), progress_label.config(text=l)))
+                else:
+                    self.root.after(0, lambda: progress_bar.configure(value=p))
+            def ui_result(text):
+                t = text
+                self.root.after(0, lambda: result_label.config(text=t))
+
             try:
                 # ========== 1단계: 기존 단지의 연식 보정 ==========
-                debug_text.insert('end', "=== 1단계: 기존 단지 연식 보정 ===\n")
-                debug_text.see('end')
-                progress_window.update_idletasks()
+                ui_text("=== 1단계: 기존 단지 연식 보정 ===\n")
                 
                 build_year_updated = 0
+                total_apts_1 = len(self.monitored_apts)
                 for idx, apt in enumerate(self.monitored_apts):
                     if cancel_flag[0]:
                         break
-                    
+
                     # 진행률 업데이트 (1단계는 전체의 30%)
-                    progress = (idx / len(self.monitored_apts)) * 30
-                    progress_bar['value'] = progress
-                    progress_label.config(text=f"연식 보정 중: {idx + 1}/{len(self.monitored_apts)}")
-                    progress_window.update_idletasks()
-                    
+                    progress = (idx / total_apts_1) * 30
+                    ui_progress(progress, f"연식 보정 중: {idx + 1}/{total_apts_1}")
+
                     # 연식이 비어있거나 유효하지 않은 경우
                     current_build_year = str(apt.get('build_year', '')).strip()
                     if not current_build_year or current_build_year == '':
-                        debug_text.insert('end', f"  {apt.get('apt_name', '')} - 연식 정보 없음, 보정 시도...\n")
-                        debug_text.see('end')
-                        
+                        ui_text(f"  {apt.get('apt_name', '')} - 연식 정보 없음, 보정 시도...\n")
+
                         # 연식 정보 보정 시도
                         resolved_year = self.resolve_build_year(
                             sigungu_code=apt.get('sigungu_code', ''),
@@ -5319,32 +5329,27 @@ class RealEstateMonitorApp:
                             months=24,  # 최근 24개월 데이터 검색
                             fallback_text=None
                         )
-                        
+
                         if resolved_year:
                             apt['build_year'] = resolved_year
                             build_year_updated += 1
-                            debug_text.insert('end', f"    ✓ 연식 보정 완료: {resolved_year}\n")
-                            debug_text.see('end')
+                            ui_text(f"    ✓ 연식 보정 완료: {resolved_year}\n")
                         else:
-                            debug_text.insert('end', f"    ✗ 연식 정보를 찾을 수 없음\n")
-                            debug_text.see('end')
-                
-                debug_text.insert('end', f"\n연식 보정 완료: {build_year_updated}개 단지\n\n")
-                debug_text.see('end')
-                
+                            ui_text("    ✗ 연식 정보를 찾을 수 없음\n")
+
+                ui_text(f"\n연식 보정 완료: {build_year_updated}개 단지\n\n")
+
                 # ========== 2단계: 기존 단지들의 시군구 코드 수집 ==========
-                debug_text.insert('end', "=== 2단계: 시군구 코드 수집 ===\n")
+                ui_text("=== 2단계: 시군구 코드 수집 ===\n")
                 sigungu_codes = set()
                 for apt in self.monitored_apts:
                     if 'sigungu_code' in apt:
                         sigungu_codes.add(apt['sigungu_code'])
-                
-                debug_text.insert('end', f"모니터링 중인 시군구 코드: {sigungu_codes}\n\n")
-                debug_text.see('end')
-                progress_window.update_idletasks()
+
+                ui_text(f"모니터링 중인 시군구 코드: {sigungu_codes}\n\n")
                 
                 # ========== 3단계: 각 시군구의 최근 거래 데이터에서 새로운 단지 탐색 ==========
-                debug_text.insert('end', "=== 3단계: 신규 단지 탐색 및 신고가 검증 ===\n")
+                ui_text("=== 3단계: 신규 단지 탐색 및 신고가 검증 ===\n")
                 new_complexes = []
                 total_checked = 0
                 corrected_count = 0
@@ -5361,12 +5366,12 @@ class RealEstateMonitorApp:
                     apt_key = f"{apt.get('apt_name')}_{apt.get('dong')}_{str(apt.get('area', '')).replace('㎡', '').strip()}"
                     existing_apts_dict[apt_key] = apt
 
+                n_sigungu = len(sigungu_codes)
                 for sigungu_idx, sigungu_code in enumerate(sigungu_codes):
                     if cancel_flag[0]:
                         break
 
-                    debug_text.insert('end', f"\n시군구 {sigungu_code} 스캔 중...\n")
-                    debug_text.see('end')
+                    ui_text(f"\n시군구 {sigungu_code} 스캔 중...\n")
 
                     # 해당 시군구의 모든 거래 데이터 수집
                     all_apt_info = {}
@@ -5380,10 +5385,8 @@ class RealEstateMonitorApp:
 
                         # ★ GUI 업데이트 빈도 감소: 10개월마다 한 번만 업데이트
                         if month_idx % 10 == 0:
-                            progress = 30 + ((sigungu_idx * months_to_check + month_idx) / (len(sigungu_codes) * months_to_check)) * 60
-                            progress_bar['value'] = min(progress, 90)
-                            progress_label.config(text=f"데이터 수집 중: {sigungu_idx+1}/{len(sigungu_codes)} 시군구, {month_idx}/{months_to_check} 개월")
-                            progress_window.update_idletasks()
+                            progress = 30 + ((sigungu_idx * months_to_check + month_idx) / (n_sigungu * months_to_check)) * 60
+                            ui_progress(min(progress, 90), f"데이터 수집 중: {sigungu_idx+1}/{n_sigungu} 시군구, {month_idx}/{months_to_check} 개월")
 
                         # 캐시 활용하여 데이터 가져오기
                         existing_data = self.get_cached_api_data(sigungu_code, deal_ymd, 'existing')
@@ -5423,9 +5426,10 @@ class RealEstateMonitorApp:
                             except:
                                 continue
                     
-                    debug_text.insert('end', f"  발견된 단지: {len(all_apt_info)}개\n")
+                    ui_text(f"  발견된 단지: {len(all_apt_info)}개\n")
 
                     # 3단계: 기존 모니터링 목록과 비교
+                    n_all_apt = max(len(all_apt_info), 1)
                     for apt_key, apt_data in all_apt_info.items():
                         if cancel_flag[0]:
                             break
@@ -5447,7 +5451,7 @@ class RealEstateMonitorApp:
                         if not exists and apt_data['trades']:
                             # 새로운 단지 발견
                             max_trade = max(apt_data['trades'], key=lambda x: x['price'])
-                            
+
                             # sido, sigungu 정보 찾기
                             sido = ''
                             sigungu = ''
@@ -5456,10 +5460,10 @@ class RealEstateMonitorApp:
                                     sido = apt.get('sido', '')
                                     sigungu = apt.get('sigungu', '')
                                     break
-                            
+
                             # ★ API에서 받은 연식 정보 활용 (추가 조회 최소화)
                             build_year = apt_data.get('build_year', '').strip()
-                            
+
                             # ★★★ 신규 단지: prev와 last를 모두 찾은 최고가로 설정 ★★★
                             new_apt = {
                                 'apt_name': apt_name,
@@ -5480,17 +5484,15 @@ class RealEstateMonitorApp:
                                 'trade_data': apt_data['trades'],
                                 'build_year': build_year  # ★ 연식 정보 포함
                             }
-                            
+
                             new_complexes.append(new_apt)
                             year_info = f" (연식: {build_year})" if build_year else " (연식 정보 없음)"
-                            debug_text.insert('end', f"  [신규] {apt_name} {area}㎡{year_info} - 최고가: {max_trade['price']:,}만원\n")
-                            
+                            ui_text(f"  [신규] {apt_name} {area}㎡{year_info} - 최고가: {max_trade['price']:,}만원\n")
+
                         elif exists and existing_apt and apt_data['trades']:
                             # 기존 단지의 신고가 체크
                             max_trade = max(apt_data['trades'], key=lambda x: x['price'])
                             if max_trade['price'] > existing_apt.get('last_max_price', 0):
-                                # ★★★ 신고가 다시 찾기: 역대 최고가를 찾았으므로 prev와 last 모두 같은 값으로 설정 ★★★
-                                # 이렇게 해야 '데이터 갱신' 시 정확한 신고가 비교 가능
                                 existing_apt['prev_max_price'] = max_trade['price']
                                 existing_apt['prev_max_date'] = max_trade['date'].strftime('%Y-%m-%d')
                                 existing_apt['prev_max_floor'] = max_trade.get('floor', '')
@@ -5503,7 +5505,7 @@ class RealEstateMonitorApp:
                                 existing_apt['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M')
 
                                 corrected_count += 1
-                                debug_text.insert('end', f"  [신고가] {apt_name} {area}㎡ - {max_trade['price']:,}만원\n")
+                                ui_text(f"  [신고가] {apt_name} {area}㎡ - {max_trade['price']:,}만원\n")
 
                             # ★ 검증 완료된 단지는 rechecked_apts에 추가 (다음 실행 시 스킵)
                             self.rechecked_apts.add(lookup_key)
@@ -5511,17 +5513,14 @@ class RealEstateMonitorApp:
                         total_checked += 1
                         # ★ GUI 업데이트 빈도 감소: 배치 처리
                         if total_checked % 20 == 0:
-                            progress = 30 + ((sigungu_idx + (total_checked / len(all_apt_info))) / len(sigungu_codes)) * 60
-                            progress_bar['value'] = min(progress, 90)
-                            result_label.config(text=f"연식 보정: {build_year_updated}개 / 신규: {len(new_complexes)}개 / 신고가: {corrected_count}개 / 스킵: {skipped_count}개")
-                            progress_window.update_idletasks()
-                    
-                    debug_text.see('end')
-                
+                            progress = 30 + ((sigungu_idx + (total_checked / n_all_apt)) / n_sigungu) * 60
+                            ui_progress(min(progress, 90))
+                            ui_result(f"연식 보정: {build_year_updated}개 / 신규: {len(new_complexes)}개 / 신고가: {corrected_count}개 / 스킵: {skipped_count}개")
+
                 # 4단계: 새로운 단지들을 모니터링 목록에 추가
                 if new_complexes:
                     self.monitored_apts.extend(new_complexes)
-                    debug_text.insert('end', f"\n총 {len(new_complexes)}개 신규 단지 추가됨\n")
+                    ui_text(f"\n총 {len(new_complexes)}개 신규 단지 추가됨\n")
 
                 # ★ 중복 아파트 병합 (분양권+준공후 거래 통합)
                 before_count = len(self.monitored_apts)
@@ -5530,12 +5529,10 @@ class RealEstateMonitorApp:
                 self.monitored_lists["lists"][self.active_list.get()] = self.monitored_apts
                 after_count = len(self.monitored_apts)
                 if before_count > after_count:
-                    debug_text.insert('end', f"중복 병합: {before_count}개 -> {after_count}개 ({before_count - after_count}개 통합)\n")
+                    ui_text(f"중복 병합: {before_count}개 -> {after_count}개 ({before_count - after_count}개 통합)\n")
 
                 # ★ 5단계: 연식 없는 단지들만 배치로 연식 조회
-                debug_text.insert('end', "\n=== 4단계: 연식 정보 보정 ===\n")
-                debug_text.see('end')
-                progress_window.update_idletasks()
+                ui_text("\n=== 4단계: 연식 정보 보정 ===\n")
 
                 apts_without_year = []
                 for apt in self.monitored_apts:
@@ -5544,19 +5541,17 @@ class RealEstateMonitorApp:
                         apts_without_year.append(apt)
 
                 year_resolved_count = 0
+                n_without_year = max(len(apts_without_year), 1)
                 if apts_without_year:
-                    debug_text.insert('end', f"연식 정보가 없는 단지: {len(apts_without_year)}개\n")
-                    debug_text.see('end')
+                    ui_text(f"연식 정보가 없는 단지: {len(apts_without_year)}개\n")
 
                     for idx, apt in enumerate(apts_without_year):
                         if cancel_flag[0]:
                             break
 
                         if idx % 5 == 0:  # 5개마다 GUI 업데이트
-                            progress = 90 + (idx / len(apts_without_year)) * 10
-                            progress_bar['value'] = min(progress, 100)
-                            progress_label.config(text=f"연식 조회 중: {idx}/{len(apts_without_year)}")
-                            progress_window.update_idletasks()
+                            progress = 90 + (idx / n_without_year) * 10
+                            ui_progress(min(progress, 100), f"연식 조회 중: {idx}/{len(apts_without_year)}")
 
                         resolved_year = self.resolve_build_year(
                             sigungu_code=apt.get('sigungu_code', ''),
@@ -5569,36 +5564,46 @@ class RealEstateMonitorApp:
                         if resolved_year:
                             apt['build_year'] = resolved_year
                             year_resolved_count += 1
-                            debug_text.insert('end', f"  ✓ {apt.get('apt_name', '')} - {resolved_year}\n")
-                            debug_text.see('end')
+                            ui_text(f"  ✓ {apt.get('apt_name', '')} - {resolved_year}\n")
 
-                    debug_text.insert('end', f"\n연식 보정 완료: {year_resolved_count}/{len(apts_without_year)}개\n")
-                    debug_text.see('end')
+                    ui_text(f"\n연식 보정 완료: {year_resolved_count}/{len(apts_without_year)}개\n")
 
-                # 저장 및 화면 갱신
+                # 저장 (메인 스레드에서 UI 갱신)
                 self.save_monitored_apts()
-                self.update_apt_tree()
 
-                progress_bar['value'] = 100
-                progress_label.config(text="완료!")
+                total_c = total_checked
+                skip_c = skipped_count
+                new_c = len(new_complexes)
+                corr_c = corrected_count
+                year_c = build_year_updated + year_resolved_count
 
-                messagebox.showinfo("완료",
-                    f"신고가 재검증이 완료되었습니다.\n"
-                    f"기존 단지 검증: {total_checked - skipped_count}개\n"
-                    f"검증 스킵: {skipped_count}개\n"
-                    f"신규 단지: {len(new_complexes)}개 추가\n"
-                    f"신고가 갱신: {corrected_count}개\n"
-                    f"연식 보정: {build_year_updated + year_resolved_count}개")
+                def _finish():
+                    self.update_apt_tree()
+                    progress_bar.configure(value=100)
+                    progress_label.config(text="완료!")
+                    messagebox.showinfo("완료",
+                        f"신고가 재검증이 완료되었습니다.\n"
+                        f"기존 단지 검증: {total_c - skip_c}개\n"
+                        f"검증 스킵: {skip_c}개\n"
+                        f"신규 단지: {new_c}개 추가\n"
+                        f"신고가 갱신: {corr_c}개\n"
+                        f"연식 보정: {year_c}개")
+                    try:
+                        progress_window.destroy()
+                    except:
+                        pass
+                self.root.after(0, _finish)
 
-                progress_window.destroy()
-                
             except Exception as e:
-                messagebox.showerror("오류", f"재검증 중 오류 발생: {str(e)}")
-                debug_text.insert('end', f"\n오류: {str(e)}\n")
-                try:
-                    progress_window.destroy()
-                except:
-                    pass
+                err_msg = str(e)
+                def _on_error():
+                    messagebox.showerror("오류", f"재검증 중 오류 발생: {err_msg}")
+                    try:
+                        debug_text.insert('end', f"\n오류: {err_msg}\n")
+                        progress_window.destroy()
+                    except:
+                        pass
+                self.root.after(0, _on_error)
         
         thread = threading.Thread(target=process_recheck, daemon=True)
         thread.start()

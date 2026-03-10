@@ -5742,7 +5742,31 @@ class RealEstateMonitorApp:
                     if new_max_price_trade['price'] > old_max_price:
                         new_max_found = True
 
-                        # 신고가 정보 딕셔너리 생성 - build_year 확실히 포함
+                        # ★ ±1㎡ 그룹 최고가 계산: 같은 단지명 + 면적 ±1㎡ 이내 엔트리들의 현재 저장 최고가 중 최댓값
+                        try:
+                            apt_area = float(str(apt_info.get('area', '')).replace('㎡', '').strip() or 0)
+                        except (ValueError, TypeError):
+                            apt_area = 0.0
+
+                        similar_area_group_max = old_max_price  # 기본값: 현재 엔트리의 기존 최고가
+                        if apt_area > 0:
+                            for other_apt in self.monitored_apts:
+                                if other_apt.get('apt_name') == apt_info.get('apt_name') and other_apt is not apt_info:
+                                    try:
+                                        other_area = float(str(other_apt.get('area', '')).replace('㎡', '').strip() or 0)
+                                        if abs(other_area - apt_area) <= 1.0:
+                                            similar_area_group_max = max(similar_area_group_max, other_apt.get('last_max_price', 0))
+                                    except (ValueError, TypeError):
+                                        pass
+
+                        # 그룹 내 진짜 신고가 여부: ±1㎡ 타입 전체 최고가를 넘어야 HTML 알림 대상
+                        is_group_new_high = new_max_price_trade['price'] > similar_area_group_max
+                        if not is_group_new_high:
+                            logging.info(
+                                f"[그룹 신고가 제외] {apt_info['apt_name']} {apt_info.get('area','')} "
+                                f"신가:{new_max_price_trade['price']:,}만원 < 그룹최고가:{similar_area_group_max:,}만원 → HTML 알림 제외"
+                            )
+
                         # 신고가 정보 딕셔너리 생성 - build_year 확실히 포함
                         build_year = str(apt_info.get('build_year', ''))
                         current_year = datetime.now().year
@@ -5786,8 +5810,9 @@ class RealEstateMonitorApp:
                         print(f"  이전 층: {old_max_floor}")
                         print(f"  이전 동: {old_max_dong}")
 
-
-                        apt_with_new_max.append(new_max_info)
+                        # ★ 그룹 신고가인 경우에만 HTML 알림 목록에 추가
+                        if is_group_new_high:
+                            apt_with_new_max.append(new_max_info)
 
                         # 디버깅을 위한 출력
                         logging.info(f"신고가 발견: {apt_info['apt_name']}, 연식: {apt_info.get('build_year', '없음')}")

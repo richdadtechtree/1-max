@@ -184,7 +184,6 @@ def init_database(db_path):
             max_price_floor TEXT,
             max_price_dong TEXT,
             last_update TEXT,
-            new_high_at_last_update INTEGER DEFAULT 0,
             created_at TEXT NOT NULL,
             FOREIGN KEY (list_id) REFERENCES monitoring_lists(id) ON DELETE CASCADE
         )
@@ -290,13 +289,6 @@ def init_database(db_path):
         if 'prev_max_dong' not in nh_columns:
             cursor.execute("ALTER TABLE notifications_history ADD COLUMN prev_max_dong TEXT")
             logging.info("notifications_history 테이블에 prev_max_dong 컬럼 추가됨")
-
-        # apartments 테이블 마이그레이션: new_high_at_last_update 컬럼 추가
-        cursor.execute("PRAGMA table_info(apartments)")
-        apt_columns = [col[1] for col in cursor.fetchall()]
-        if 'new_high_at_last_update' not in apt_columns:
-            cursor.execute("ALTER TABLE apartments ADD COLUMN new_high_at_last_update INTEGER DEFAULT 0")
-            logging.info("apartments 테이블에 new_high_at_last_update 컬럼 추가됨")
 
         conn.commit()
     except Exception as e:
@@ -1546,39 +1538,20 @@ class RealEstateMonitorApp:
                 # 스키마에 따라 다른 쿼리 실행
                 if has_area:
                     # 원래 프로그램의 스키마 (area, sido 등 사용)
-                    # new_high_at_last_update 컬럼 존재 여부 확인 (마이그레이션 대응)
-                    has_new_high_col = 'new_high_at_last_update' in columns
-                    if has_new_high_col:
-                        cursor.execute("""
-                            SELECT id, apt_name, area, sido, sigungu, dong, sigungu_code,
-                                   jibun_addr, build_year, prev_max_price, prev_max_date,
-                                   prev_max_floor, prev_max_dong, last_max_price, max_price_date,
-                                   max_price_floor, max_price_dong, last_update, new_high_at_last_update
-                            FROM apartments
-                            WHERE list_id = ?
-                        """, (list_id,))
-                    else:
-                        cursor.execute("""
-                            SELECT id, apt_name, area, sido, sigungu, dong, sigungu_code,
-                                   jibun_addr, build_year, prev_max_price, prev_max_date,
-                                   prev_max_floor, prev_max_dong, last_max_price, max_price_date,
-                                   max_price_floor, max_price_dong, last_update
-                            FROM apartments
-                            WHERE list_id = ?
-                        """, (list_id,))
+                    cursor.execute("""
+                        SELECT id, apt_name, area, sido, sigungu, dong, sigungu_code,
+                               jibun_addr, build_year, prev_max_price, prev_max_date,
+                               prev_max_floor, prev_max_dong, last_max_price, max_price_date,
+                               max_price_floor, max_price_dong, last_update
+                        FROM apartments
+                        WHERE list_id = ?
+                    """, (list_id,))
 
                     for apt_row in cursor.fetchall():
-                        if has_new_high_col:
-                            (apt_id, apt_name, area, sido, sigungu, dong, sigungu_code,
-                             jibun_addr, build_year, prev_max_price, prev_max_date,
-                             prev_max_floor, prev_max_dong, last_max_price, max_price_date,
-                             max_price_floor, max_price_dong, last_update, new_high_at_last_update) = apt_row
-                        else:
-                            (apt_id, apt_name, area, sido, sigungu, dong, sigungu_code,
-                             jibun_addr, build_year, prev_max_price, prev_max_date,
-                             prev_max_floor, prev_max_dong, last_max_price, max_price_date,
-                             max_price_floor, max_price_dong, last_update) = apt_row
-                            new_high_at_last_update = 0
+                        (apt_id, apt_name, area, sido, sigungu, dong, sigungu_code,
+                         jibun_addr, build_year, prev_max_price, prev_max_date,
+                         prev_max_floor, prev_max_dong, last_max_price, max_price_date,
+                         max_price_floor, max_price_dong, last_update) = apt_row
 
                         # 거래 데이터 로드
                         cursor.execute("""
@@ -1618,7 +1591,6 @@ class RealEstateMonitorApp:
                             'max_price_floor': max_price_floor,
                             'max_price_dong': max_price_dong,
                             'last_update': last_update,
-                            'new_high_at_last_update': bool(new_high_at_last_update),
                             'trade_data': trade_data
                         })
 
@@ -1748,7 +1720,6 @@ class RealEstateMonitorApp:
                             'max_price_floor': max_price_floor,
                             'max_price_dong': max_price_dong,
                             'last_update': last_update,
-                            'new_high_at_last_update': False,
                             'trade_data': trade_data
                         })
 
@@ -1939,8 +1910,8 @@ class RealEstateMonitorApp:
                             (list_id, apt_name, area, sido, sigungu, dong, sigungu_code,
                              jibun_addr, build_year, prev_max_price, prev_max_date,
                              prev_max_floor, prev_max_dong, last_max_price, max_price_date,
-                             max_price_floor, max_price_dong, last_update, new_high_at_last_update, created_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             max_price_floor, max_price_dong, last_update, created_at)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """, (
                             list_id,
                             apt.get('apt_name', ''),
@@ -1960,7 +1931,6 @@ class RealEstateMonitorApp:
                             apt.get('max_price_floor', ''),
                             apt.get('max_price_dong', ''),
                             apt.get('last_update', now),
-                            1 if apt.get('new_high_at_last_update', False) else 0,
                             now
                         ))
                     else:
@@ -3344,8 +3314,8 @@ class RealEstateMonitorApp:
         # DB에 저장 (이전 신고가 기록으로 유지)
         self.save_previous_high_to_db(apts_with_prev_high)
 
-        # 팝업창 표시 (파일명은 apt_list의 sido 기반으로 결정 → 기존 HTML 파일명과 동일)
-        self.show_new_max_notification(apts_with_prev_high, prefer_content_filename=True)
+        # 팝업창 표시
+        self.show_new_max_notification(apts_with_prev_high)
 
     def show_previous_notifications(self):
         """이전 신고가 히스토리 표시"""
@@ -3429,7 +3399,7 @@ class RealEstateMonitorApp:
                     if apt_list:
                         history_dialog.destroy()
                         original_history_count = len(self.notifications_history)
-                        self.show_new_max_notification(apt_list, prefer_content_filename=True, list_name_hint=stored_list_name)
+                        self.show_new_max_notification(apt_list, list_name_hint=stored_list_name)
                         if len(self.notifications_history) > original_history_count:
                             self.notifications_history = self.notifications_history[:-1]
                             self.save_notifications_history()
@@ -3776,9 +3746,22 @@ class RealEstateMonitorApp:
                 apt.get("last_update", "업데이트 필요")
             ))
     
-            # ★★★ 핑크색 표시: 가장 최근 데이터 갱신 시 신고가를 보인 단지만 ★★★
-            if apt.get('new_high_at_last_update', False):
-                self.apt_tree.item(item_id, tags=('price_up',))
+            # ★★★ 핑크색 표시: 최근 7일 이내에 신고가가 갱신된 단지만 ★★★
+            if prev_max_price > 0 and last_max_price > prev_max_price:
+                # last_update 시간 확인 (최근 7일 이내만 핑크색)
+                last_update_str = apt.get('last_update', '')
+                is_recent = False
+                if last_update_str:
+                    try:
+                        last_update_time = datetime.strptime(last_update_str, '%Y-%m-%d %H:%M')
+                        days_diff = (datetime.now() - last_update_time).days
+                        if days_diff <= 7:  # 7일 이내
+                            is_recent = True
+                    except:
+                        pass
+
+                if is_recent:
+                    self.apt_tree.item(item_id, tags=('price_up',))
             elif prev_max_price > 0 and last_max_price < prev_max_price:
                 self.apt_tree.item(item_id, tags=('price_down',))
     
@@ -5744,31 +5727,7 @@ class RealEstateMonitorApp:
                     if new_max_price_trade['price'] > old_max_price:
                         new_max_found = True
 
-                        # ★ ±1㎡ 그룹 최고가 계산: 같은 단지명 + 면적 ±1㎡ 이내 엔트리들의 현재 저장 최고가 중 최댓값
-                        try:
-                            apt_area = float(str(apt_info.get('area', '')).replace('㎡', '').strip() or 0)
-                        except (ValueError, TypeError):
-                            apt_area = 0.0
-
-                        similar_area_group_max = old_max_price  # 기본값: 현재 엔트리의 기존 최고가
-                        if apt_area > 0:
-                            for other_apt in self.monitored_apts:
-                                if other_apt.get('apt_name') == apt_info.get('apt_name') and other_apt is not apt_info:
-                                    try:
-                                        other_area = float(str(other_apt.get('area', '')).replace('㎡', '').strip() or 0)
-                                        if abs(other_area - apt_area) <= 1.0:
-                                            similar_area_group_max = max(similar_area_group_max, other_apt.get('last_max_price', 0))
-                                    except (ValueError, TypeError):
-                                        pass
-
-                        # 그룹 내 진짜 신고가 여부: ±1㎡ 타입 전체 최고가를 넘어야 HTML 알림 대상
-                        is_group_new_high = new_max_price_trade['price'] > similar_area_group_max
-                        if not is_group_new_high:
-                            logging.info(
-                                f"[그룹 신고가 제외] {apt_info['apt_name']} {apt_info.get('area','')} "
-                                f"신가:{new_max_price_trade['price']:,}만원 < 그룹최고가:{similar_area_group_max:,}만원 → HTML 알림 제외"
-                            )
-
+                        # 신고가 정보 딕셔너리 생성 - build_year 확실히 포함
                         # 신고가 정보 딕셔너리 생성 - build_year 확실히 포함
                         build_year = str(apt_info.get('build_year', ''))
                         current_year = datetime.now().year
@@ -5812,9 +5771,8 @@ class RealEstateMonitorApp:
                         print(f"  이전 층: {old_max_floor}")
                         print(f"  이전 동: {old_max_dong}")
 
-                        # ★ 그룹 신고가인 경우에만 HTML 알림 목록에 추가
-                        if is_group_new_high:
-                            apt_with_new_max.append(new_max_info)
+
+                        apt_with_new_max.append(new_max_info)
 
                         # 디버깅을 위한 출력
                         logging.info(f"신고가 발견: {apt_info['apt_name']}, 연식: {apt_info.get('build_year', '없음')}")
@@ -5830,8 +5788,6 @@ class RealEstateMonitorApp:
                         apt_info['max_price_date'] = date_str
                         apt_info['max_price_floor'] = new_max_price_trade.get('floor', '')
                         apt_info['max_price_dong'] = new_max_price_trade.get('dong', '-')
-                        # ★ 이번 갱신에서 신고가 발생 → 핑크색 표시 플래그 ON
-                        apt_info['new_high_at_last_update'] = True
                     else:
                         # ★★★ 신고가가 아닌 경우: last_max_price가 여전히 최고가이므로 유지 ★★★
                         # 단, 기존 last_max_price보다 높은 거래가 있다면 그것으로 갱신
@@ -5841,8 +5797,6 @@ class RealEstateMonitorApp:
                             apt_info['max_price_date'] = date_str
                             apt_info['max_price_floor'] = new_max_price_trade.get('floor', '')
                             apt_info['max_price_dong'] = new_max_price_trade.get('dong', '-')
-                        # ★ 이번 갱신에서 신고가 없음 → 핑크색 표시 플래그 OFF
-                        apt_info['new_high_at_last_update'] = False
 
                     # 모든 경우에 공통으로 업데이트
                     apt_info['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -6005,9 +5959,7 @@ class RealEstateMonitorApp:
         }
 
     def build_notification_html(self, apt_list, region_name=None):
-        """신고가 알림용 HTML (날짜 필터 + 상승률 필터 포함)
-        region_name: 미리 결정된 지역명 (없으면 apt_list의 sido로 자동 판별)
-        """
+        """신고가 알림용 HTML (날짜 필터 + 상승률 필터 포함)"""
         from html import escape
         from collections import Counter
         import re
@@ -6023,15 +5975,14 @@ class RealEstateMonitorApp:
         now = datetime.now().strftime('%Y-%m-%d %H:%M')
         current_year = datetime.now().year
 
+        # region_name 자동 판별 (파라미터로 받지 못한 경우)
+        if not region_name:
+            region_name = self._get_region_display_name(apt_list)
+
         # 신고가 높은 순으로 정렬
         apt_list = sorted(apt_list, key=lambda x: x.get('new_price', 0), reverse=True)
         total = len(apt_list)
-
-        # 지역 표시명 계산: 호출 측에서 미리 결정된 region_name 우선, 없으면 apt_list sido로 판별
-        region_display = region_name or self._get_region_display_name(apt_list)
-        page_title    = f"{region_display} 부태리의 신고가" if region_display else "부태리의 신고가"
-        h1_title      = f"{region_display} 신고가"        if region_display else "부태리의 신고가 알림"
-
+        
         # 지역별 건수 집계 및 연식별 카운트
         region_counter = Counter()
         young_count = 0  # 10년 이하
@@ -6288,7 +6239,7 @@ class RealEstateMonitorApp:
         <head>
         <meta charset="utf-8"/>
         <meta content="width=device-width, initial-scale=1" name="viewport"/>
-        <title>{escape(page_title)} - {escape(now)}</title>
+        <title>{escape(region_name) + " 신고가" if region_name else "신고가 알림"} - {escape(now)}</title>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
         <style>
           :root {{
@@ -6692,7 +6643,7 @@ class RealEstateMonitorApp:
           <div class="watermark"><div class="watermark-text">{"".join(['<span>부태리 ⓒ 2025</span>' for _ in range(100)])}</div></div>
           <div class="page">
             <header class="header">
-              <h1>{escape(h1_title)}</h1>
+              <h1>{escape(region_name) + " 신고가" if region_name else "신고가 알림"}</h1>
               <p class="sub">{escape(now)} 기준 · 총 {total}개 아파트</p>
 
               <!-- 상단 칩: 연식별 필터 및 그래프 버튼 -->
@@ -8776,9 +8727,7 @@ class RealEstateMonitorApp:
         return html_content
 
     def _get_region_display_name(self, apt_list=None):
-        """apt_list의 sido 정보로 표시용 지역명 반환 (예: '서울 & 수도권', '부산', '대구')
-        DB에는 '서울특별시', '경기도', '부산광역시' 등 전체 이름이 저장되므로 부분 일치로 판별
-        """
+        """apt_list의 sido/sigungu 정보로 표시용 지역명 반환 (예: '서울 & 수도권', '부산', '대구')"""
         if not apt_list:
             return ""
         sido_set = set()
@@ -8786,8 +8735,6 @@ class RealEstateMonitorApp:
             s = apt.get('sido', '')
             if s:
                 sido_set.add(s)
-        if not sido_set:
-            return ""
 
         def _has(keywords):
             return any(any(kw in s for kw in keywords) for s in sido_set)
@@ -8807,12 +8754,42 @@ class RealEstateMonitorApp:
         if _has(["세종"]):
             return "세종"
         if len(sido_set) == 1:
-            # 전체 이름에서 특별시/광역시/도 제거해 간략 표시
             s = list(sido_set)[0]
             for suffix in ["특별자치시", "특별자치도", "특별시", "광역시", "도"]:
                 s = s.replace(suffix, "")
             return s.strip()
-        return " & ".join(sorted(sido_set))
+
+        # sido 비어있을 때: sigungu 이름으로 지역 판별
+        sigungu_set = {apt.get("sigungu", "") for apt in apt_list if apt.get("sigungu")}
+        if sigungu_set:
+            BUSAN_ONLY   = {"해운대구", "수영구", "동래구", "영도구", "연제구",
+                            "사상구", "기장군", "부산진구", "사하구", "금정구"}
+            DAEGU_ONLY   = {"수성구", "달서구", "달성군"}
+            DAEJEON_ONLY = {"유성구", "대덕구"}
+            GWANGJU_ONLY = {"광산구"}
+            ULSAN_ONLY   = {"울주군"}
+            INCHEON_ONLY = {"계양구", "미추홀구", "연수구"}
+            SEOUL_ONLY   = {"강남구", "강동구", "강북구", "관악구", "광진구",
+                            "구로구", "금천구", "노원구", "도봉구", "동대문구",
+                            "동작구", "마포구", "서대문구", "서초구", "성동구",
+                            "성북구", "송파구", "양천구", "영등포구", "용산구",
+                            "은평구", "종로구", "중랑구"}
+            GYEONGGI_ONLY = {"수정구", "중원구", "분당구", "장안구", "권선구",
+                             "팔달구", "영통구", "만안구", "동안구", "원미구",
+                             "소사구", "오정구", "일산동구", "일산서구", "덕양구"}
+            if sigungu_set & BUSAN_ONLY:
+                return "부산"
+            if sigungu_set & DAEGU_ONLY:
+                return "대구"
+            if sigungu_set & DAEJEON_ONLY:
+                return "대전"
+            if sigungu_set & GWANGJU_ONLY:
+                return "광주"
+            if sigungu_set & ULSAN_ONLY:
+                return "울산"
+            if sigungu_set & (INCHEON_ONLY | SEOUL_ONLY | GYEONGGI_ONLY):
+                return "서울 & 수도권"
+        return ""
 
     def _get_newtrade_filename(self, apt_list=None, prefer_content=False, list_name_hint=None):
         """현재 활성 리스트 이름(또는 apt_list의 sido 정보)에 따른 HTML 파일명 반환
@@ -8918,7 +8895,7 @@ class RealEstateMonitorApp:
         - ask_path=True 이면 저장 위치를 사용자에게 물음
         - silent=True 이면 메시지박스 없이 조용히 저장
         - fixed_filename: 호출 시점에 미리 확정된 파일명 (active_list가 변경된 경우 대비)
-        - region_name: 미리 결정된 지역명 → HTML 제목/h1에 반영 (이전신고가 재다운로드 등)
+        - region_name: HTML 타이틀에 표시할 지역명
         """
         import traceback
         import shutil
@@ -12901,26 +12878,19 @@ function closeChartModal() {
         return html_content
 
 
-    def show_new_max_notification(self, apt_list, prefer_content_filename=False, list_name_hint=None):
+    def show_new_max_notification(self, apt_list, list_name_hint=None):
         """신고가 발견 시 9:16 비율 알림 창 (페이지네이션 + 캡처 기능)
-        prefer_content_filename=True: apt_list의 sido 기반으로 파일명 결정 (이전신고가 재다운로드용)
         list_name_hint: 히스토리 재생 시 저장된 리스트명 (sido 미설정 시 파일명 결정에 사용)
         """
         if not apt_list:
             return
 
-        # 파일명을 지금 확정 (active_list가 나중에 변경될 수 있으므로 미리 캡처)
-        _fixed_filename = self._get_newtrade_filename(apt_list, prefer_content=prefer_content_filename, list_name_hint=list_name_hint)
+        # 파일명 및 지역명을 지금 확정 (active_list가 나중에 변경될 수 있으므로 미리 캡처)
+        _fixed_filename = self._get_newtrade_filename(apt_list, prefer_content=True, list_name_hint=list_name_hint)
+        _region_display = self._get_region_display_name(apt_list)
 
         # 신고가 높은 순으로 정렬
         apt_list = sorted(apt_list, key=lambda x: x.get('new_price', 0), reverse=True)
-
-        # 지역 표시명 계산 (창 제목·라벨에 사용)
-        _region_display  = self._get_region_display_name(apt_list)
-        _window_title    = f"📱 {_region_display} 부태리의 신고가" if _region_display else "📱 부태리의 신고가"
-        _label_title     = f"{_region_display} 부태리의 신고가"    if _region_display else "부태리의 신고가"
-        _notif_title     = f"{_region_display} 부태리의 신고가"    if _region_display else "부태리의 신고가"
-
         current_time = datetime.now()
 
         # 로깅 추가
@@ -12994,7 +12964,7 @@ function closeChartModal() {
         total_pages = (len(apt_list) + apts_per_page - 1) // apts_per_page
         current_page = 0
         notification_window = tk.Toplevel(self.root)
-        notification_window.title(_window_title)
+        notification_window.title(f"📱 {_region_display} 신고가" if _region_display else "📱 신고가")
         base_width = 400
         base_height = int(base_width * 16 / 9)
         screen_width = notification_window.winfo_screenwidth()
@@ -13058,7 +13028,7 @@ function closeChartModal() {
         icon_size = max(24, int(28 * scale_factor))
         icon_label = tk.Label(header_main, text="🔔", font=scaled_font('Segoe UI Emoji', icon_size), bg=colors['primary'], fg='white')
         icon_label.pack(pady=(5, 3))
-        title_label = tk.Label(header_main, text=_label_title, font=scaled_font(get_mac_font(), 18, 'bold'), bg=colors['primary'], fg='white')
+        title_label = tk.Label(header_main, text=f"{_region_display} 신고가" if _region_display else "신고가", font=scaled_font(get_mac_font(), 18, 'bold'), bg=colors['primary'], fg='white')
         title_label.pack()
         page_info_label = tk.Label(header_main, text="", font=scaled_font(get_mac_font(), 10), bg=colors['primary'], fg='#E3F2FD')
         page_info_label.pack(pady=(3, 10))
@@ -13354,7 +13324,7 @@ function closeChartModal() {
         update_page()
         notification_window.after(100, lambda: notification_window.focus_set())
         try:
-            title = _notif_title
+            title = "부태리의 신고가"
             message = f"{len(apt_list)}개 아파트에서 신고가가 발견되었습니다!"
             send_notification(title=title, message=message)
         except Exception as e:
@@ -13391,7 +13361,8 @@ function closeChartModal() {
         def gen_html(list_name, apt_list):
             self.active_list.set(list_name)
             fn = self._get_newtrade_filename(apt_list)
-            self.export_notification_html(apt_list, ask_path=False, silent=False, fixed_filename=fn)
+            rn = self._get_region_display_name(apt_list)
+            self.export_notification_html(apt_list, ask_path=False, silent=False, fixed_filename=fn, region_name=rn)
 
         for list_name, apt_list in regional_results:
             if "서울" in list_name or "수도권" in list_name:
@@ -13416,7 +13387,8 @@ function closeChartModal() {
             for list_name, apt_list in regional_results:
                 self.active_list.set(list_name)
                 fn = self._get_newtrade_filename(apt_list)
-                self.export_notification_html(apt_list, ask_path=False, silent=True, fixed_filename=fn)
+                rn = self._get_region_display_name(apt_list)
+                self.export_notification_html(apt_list, ask_path=False, silent=True, fixed_filename=fn, region_name=rn)
             self.active_list.set(prev_list)
             messagebox.showinfo("완료", f"{len(regional_results)}개 지역 HTML 생성 완료")
 

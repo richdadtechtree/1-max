@@ -3343,8 +3343,8 @@ class RealEstateMonitorApp:
         # DB에 저장 (이전 신고가 기록으로 유지)
         self.save_previous_high_to_db(apts_with_prev_high)
 
-        # 팝업창 표시
-        self.show_new_max_notification(apts_with_prev_high)
+        # 팝업창 표시 (파일명은 apt_list의 sido 기반으로 결정 → 기존 HTML 파일명과 동일)
+        self.show_new_max_notification(apts_with_prev_high, prefer_content_filename=True)
 
     def show_previous_notifications(self):
         """이전 신고가 히스토리 표시"""
@@ -3427,7 +3427,7 @@ class RealEstateMonitorApp:
                     if apt_list:
                         history_dialog.destroy()
                         original_history_count = len(self.notifications_history)
-                        self.show_new_max_notification(apt_list)
+                        self.show_new_max_notification(apt_list, prefer_content_filename=True)
                         if len(self.notifications_history) > original_history_count:
                             self.notifications_history = self.notifications_history[:-1]
                             self.save_notifications_history()
@@ -8766,8 +8766,11 @@ class RealEstateMonitorApp:
 
         return html_content
 
-    def _get_newtrade_filename(self, apt_list=None):
-        """현재 활성 리스트 이름(또는 apt_list의 sido 정보)에 따른 HTML 파일명 반환"""
+    def _get_newtrade_filename(self, apt_list=None, prefer_content=False):
+        """현재 활성 리스트 이름(또는 apt_list의 sido 정보)에 따른 HTML 파일명 반환
+        prefer_content=True 이면 active_list 이름보다 apt_list의 sido 정보를 우선으로 판별
+        (이전신고가 재다운로드 시 기존과 동일한 파일명 보장)
+        """
         list_name = self.active_list.get() if hasattr(self, 'active_list') else ""
 
         # 리스트명 → 파일명 매핑
@@ -8779,7 +8782,8 @@ class RealEstateMonitorApp:
             "광주":        "광주신고가.html",
             "울산":        "울산신고가.html",
         }
-        if list_name in name_map:
+        # prefer_content=False(기본)이고 리스트명이 매핑에 있으면 바로 반환
+        if not prefer_content and list_name in name_map:
             return name_map[list_name]
 
         # ★ 전체 통합 or 매핑 없는 리스트: apt_list의 sido로 지역 판별
@@ -12802,13 +12806,15 @@ function closeChartModal() {
         return html_content
 
 
-    def show_new_max_notification(self, apt_list):
-        """신고가 발견 시 9:16 비율 알림 창 (페이지네이션 + 캡처 기능)"""
+    def show_new_max_notification(self, apt_list, prefer_content_filename=False):
+        """신고가 발견 시 9:16 비율 알림 창 (페이지네이션 + 캡처 기능)
+        prefer_content_filename=True: apt_list의 sido 기반으로 파일명 결정 (이전신고가 재다운로드용)
+        """
         if not apt_list:
             return
 
         # 파일명을 지금 확정 (active_list가 나중에 변경될 수 있으므로 미리 캡처)
-        _fixed_filename = self._get_newtrade_filename(apt_list)
+        _fixed_filename = self._get_newtrade_filename(apt_list, prefer_content=prefer_content_filename)
 
         # 신고가 높은 순으로 정렬
         apt_list = sorted(apt_list, key=lambda x: x.get('new_price', 0), reverse=True)

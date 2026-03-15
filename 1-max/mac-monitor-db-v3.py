@@ -5945,11 +5945,15 @@ class RealEstateMonitorApp:
 
     def _safe_apt_data(self, apt):
         """apt 딕셔너리에서 안전하게 값을 추출하여 dict 반환"""
+        new_price = apt.get('new_price', 0) if not isinstance(apt.get('new_price', 0), dict) else 0
+        old_price = apt.get('old_price', 0) if not isinstance(apt.get('old_price', 0), dict) else 0
+        rise_rate = round((new_price - old_price) / old_price * 100, 1) if old_price > 0 else 0
         return {
             'name': self._safe_value(apt.get('apt_name', '')),
-            'price': apt.get('new_price', 0) if not isinstance(apt.get('new_price', 0), dict) else 0,
+            'price': new_price,
             'date': self._safe_value(apt.get('date', '')),
-            'old_price': apt.get('old_price', 0) if not isinstance(apt.get('old_price', 0), dict) else 0,
+            'old_price': old_price,
+            'rise_rate': rise_rate,
             'floor': self._safe_value(apt.get('floor', '')),
             'area': self._safe_value(apt.get('area', '')),
             'sido': self._safe_value(apt.get('sido', '')),
@@ -6636,6 +6640,75 @@ class RealEstateMonitorApp:
           .compare-count strong {{
             color: #f5576c;
           }}
+
+          /* 트리맵 상승률 모달 */
+          .treemap-modal {{
+            display: none; position: fixed; z-index: 1000;
+            left: 0; top: 0; width: 100%; height: 100%;
+            overflow: auto; background-color: rgba(0,0,0,0.7);
+          }}
+          .treemap-modal-content {{
+            background: #1a1a2e; margin: 3% auto; border-radius: 20px;
+            width: 95%; max-width: 1100px; max-height: 90vh;
+            overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            display: flex; flex-direction: column;
+          }}
+          .treemap-modal-header {{
+            padding: 18px 28px;
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            color: #fff; display: flex; justify-content: space-between; align-items: center;
+          }}
+          .treemap-modal-header h2 {{ margin: 0; font-size: 1.3em; color: #fff; }}
+          .treemap-modal-close {{
+            font-size: 2em; font-weight: bold; cursor: pointer;
+            color: #fff; line-height: 1; transition: transform 0.2s;
+          }}
+          .treemap-modal-close:hover {{ transform: scale(1.2); }}
+          .treemap-modal-body {{ padding: 16px; overflow-y: auto; flex: 1; }}
+          #treemapContainer {{
+            position: relative; width: 100%;
+            height: 520px; background: #0d1117; border-radius: 12px; overflow: hidden;
+          }}
+          .treemap-block {{
+            position: absolute; box-sizing: border-box;
+            border: 2px solid rgba(255,255,255,0.08);
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            cursor: pointer; transition: filter 0.15s;
+            overflow: hidden; border-radius: 4px;
+          }}
+          .treemap-block:hover {{ filter: brightness(1.2); z-index: 10; }}
+          .treemap-region {{
+            font-size: 11px; color: rgba(255,255,255,0.75);
+            font-weight: 500; text-align: center; line-height: 1.2;
+            padding: 0 4px; margin-bottom: 2px;
+          }}
+          .treemap-name {{
+            font-size: 13px; font-weight: 700; color: #fff;
+            text-align: center; line-height: 1.3;
+            padding: 0 6px; word-break: keep-all;
+          }}
+          .treemap-rate {{
+            font-size: 15px; font-weight: 800; color: #fff;
+            margin-top: 4px;
+          }}
+          .treemap-tooltip {{
+            position: fixed; background: rgba(0,0,0,0.92); color: #fff;
+            padding: 10px 14px; border-radius: 10px; font-size: 13px;
+            pointer-events: none; z-index: 9999; display: none;
+            line-height: 1.6; max-width: 260px;
+            border: 1px solid rgba(255,255,255,0.15);
+          }}
+          .tm-filter-btn {{
+            padding: 6px 18px; border-radius: 999px; border: 2px solid rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.08); color: #fff; font-size: 13px;
+            font-weight: 600; cursor: pointer; transition: all 0.18s;
+          }}
+          .tm-filter-btn:hover {{ background: rgba(255,255,255,0.18); }}
+          .tm-filter-btn.tm-active {{
+            background: linear-gradient(135deg, #dc2626, #991b1b);
+            border-color: #dc2626; color: #fff;
+          }}
         </style>
         </head>
         <body>
@@ -6656,6 +6729,9 @@ class RealEstateMonitorApp:
                 </span>
                 <span class="chip chip-compare" id="chip-compare" style="background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; border: none; font-weight: 600;">
                   🔗 비교단지 묶기
+                </span>
+                <span class="chip chip-treemap" id="chip-treemap" style="background: linear-gradient(135deg, #11998e, #38ef7d); color: #fff; border: none; font-weight: 600;">
+                  🗺️ 맵으로 상승률 보기
                 </span>
               </div>
 
@@ -6734,6 +6810,28 @@ class RealEstateMonitorApp:
                     비슷한 가격대(1~3천만원 차이)의 단지를 짝지어 보여드립니다.</p>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 트리맵 상승률 보기 모달 -->
+          <div id="treemapModal" class="treemap-modal">
+            <div class="treemap-modal-content">
+              <div class="treemap-modal-header">
+                <h2>🗺️ 상승률 TOP 20 트리맵</h2>
+                <span class="treemap-modal-close" onclick="closeTreemapModal()">&times;</span>
+              </div>
+              <div class="treemap-modal-body">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+                  <button id="tmBtnAll" class="tm-filter-btn tm-active" onclick="setTreemapFilter('all')">전체</button>
+                  <button id="tmBtn84"  class="tm-filter-btn" onclick="setTreemapFilter('84')">84㎡</button>
+                  <button id="tmBtn59"  class="tm-filter-btn" onclick="setTreemapFilter('59')">59㎡</button>
+                  <span id="treemapSubtitle" style="color:#9ca3af;font-size:12px;margin-left:4px;">
+                    직전 최고가 대비 상승률 상위 20개 단지 · 블록 크기 = 상승률 비례
+                  </span>
+                </div>
+                <div id="treemapContainer"></div>
+                <div class="treemap-tooltip" id="treemapTooltip"></div>
               </div>
             </div>
           </div>
@@ -7677,14 +7775,14 @@ class RealEstateMonitorApp:
           aptData.forEach(apt => {{
             const price = apt.price;
             for (let i = 0; i < brackets.length - 1; i++) {{
-              if (price >= brackets[i] && price < brackets[i + 1]) {{
+              // 첫 구간은 0 포함(>=), 이후 구간은 하한 초과(>) · 상한 이하(<=)
+              const inRange = i === 0
+                ? (price >= brackets[0] && price <= brackets[1])
+                : (price > brackets[i] && price <= brackets[i + 1]);
+              if (inRange) {{
                 counts[i]++;
                 break;
               }}
-            }}
-            // 정확히 최대값인 경우 마지막 구간에 포함
-            if (price === maxPrice && price === brackets[brackets.length - 1]) {{
-              counts[counts.length - 1]++;
             }}
           }});
 
@@ -7815,9 +7913,11 @@ class RealEstateMonitorApp:
 
         // 특정 가격대의 아파트 목록 표시
         function showAptListForBracket(bracketStart, bracketEnd, label) {{
-          // 해당 가격대의 아파트 필터링
+          // 해당 가격대의 아파트 필터링 (하한 초과 ~ 상한 이하, 첫 구간은 0 포함)
           const filteredApts = aptData.filter(apt => {{
-            return apt.price >= bracketStart && apt.price < bracketEnd;
+            return bracketStart === 0
+              ? (apt.price >= bracketStart && apt.price <= bracketEnd)
+              : (apt.price > bracketStart && apt.price <= bracketEnd);
           }});
 
           // 가격 높은 순으로 정렬
@@ -7874,11 +7974,197 @@ class RealEstateMonitorApp:
           document.getElementById('aptListModal').style.display = 'none';
         }}
 
+        // ── 트리맵 상승률 보기 ──
+        let currentTreemapFilter = 'all';
+
+        function openTreemapModal() {{
+          document.getElementById('treemapModal').style.display = 'block';
+          currentTreemapFilter = 'all';
+          renderTreemap();
+        }}
+        function closeTreemapModal() {{
+          document.getElementById('treemapModal').style.display = 'none';
+        }}
+
+        function setTreemapFilter(type) {{
+          currentTreemapFilter = type;
+          ['all','84','59'].forEach(t => {{
+            const btn = document.getElementById('tmBtn' + (t==='all'?'All':t));
+            if (btn) btn.classList.toggle('tm-active', t === type);
+          }});
+          const label = type === 'all' ? '전체' : type + '㎡ 타입';
+          const sub = document.getElementById('treemapSubtitle');
+          if (sub) sub.textContent = label + ' · 직전 최고가 대비 상승률 상위 20개 단지';
+          renderTreemap();
+        }}
+
+        function renderTreemap() {{
+          const container = document.getElementById('treemapContainer');
+          container.innerHTML = '';
+          const tooltip = document.getElementById('treemapTooltip');
+
+          // 평형 필터 (±3㎡ 허용)
+          function matchArea(a, target) {{
+            const v = parseFloat(a.area);
+            return !isNaN(v) && Math.abs(v - target) <= 3;
+          }}
+
+          let pool = aptData.filter(a => a.rise_rate > 0);
+          if (currentTreemapFilter === '84') pool = pool.filter(a => matchArea(a, 84));
+          else if (currentTreemapFilter === '59') pool = pool.filter(a => matchArea(a, 59));
+
+          // 상승률 > 0인 항목 정렬 후 top20
+          const sorted = pool
+            .sort((a, b) => b.rise_rate - a.rise_rate)
+            .slice(0, 20);
+
+          if (sorted.length === 0) {{
+            container.innerHTML = '<p style="color:#9ca3af;text-align:center;padding:60px;">상승 데이터가 없습니다.</p>';
+            return;
+          }}
+
+          const W = container.offsetWidth;
+          const H = container.offsetHeight;
+          const total = sorted.reduce((s, a) => s + a.rise_rate, 0);
+          const items = sorted.map(a => ({{ ...a, value: a.rise_rate }}));
+
+          // 스쿼리파이드 트리맵
+          function squarify(items, x, y, w, h) {{
+            if (!items.length) return [];
+            const rects = [];
+            let rem = [...items];
+            let cx = x, cy = y, cw = w, ch = h;
+            const tot = items.reduce((s,i) => s+i.value, 0);
+
+            while (rem.length > 0) {{
+              const remTot = rem.reduce((s,i) => s+i.value, 0);
+              let row = [], rowVal = 0, bestRatio = Infinity;
+
+              for (let i = 0; i < rem.length; i++) {{
+                row.push(rem[i]); rowVal += rem[i].value;
+                const short = Math.min(cw, ch);
+                const long  = Math.max(cw, ch);
+                const rowArea = (rowVal / remTot) * (cw * ch);
+                const rowShort = rowArea / long;
+                let maxR = 0;
+                for (const it of row) {{
+                  const itArea = (it.value / rowVal) * rowArea;
+                  const itOther = itArea / rowShort;
+                  maxR = Math.max(maxR, Math.max(rowShort/itOther, itOther/rowShort));
+                }}
+                if (maxR > bestRatio) {{ row.pop(); rowVal -= rem[i].value; break; }}
+                bestRatio = maxR;
+              }}
+              if (!row.length) {{ row = [rem[0]]; rowVal = rem[0].value; }}
+
+              const rowFrac = rowVal / remTot;
+              if (cw <= ch) {{
+                const rowH = ch * rowFrac;
+                let rx = cx;
+                for (const it of row) {{
+                  const itW = cw * (it.value / rowVal);
+                  rects.push({{ x:rx, y:cy, w:itW, h:rowH, item:it }});
+                  rx += itW;
+                }}
+                cy += rowH; ch -= rowH;
+              }} else {{
+                const rowW = cw * rowFrac;
+                let ry = cy;
+                for (const it of row) {{
+                  const itH = ch * (it.value / rowVal);
+                  rects.push({{ x:cx, y:ry, w:rowW, h:itH, item:it }});
+                  ry += itH;
+                }}
+                cx += rowW; cw -= rowW;
+              }}
+              rem = rem.slice(row.length);
+            }}
+            return rects;
+          }}
+
+          // 상승률에 따른 색상 (낮=연한빨강, 높=진한빨강)
+          const maxRate = sorted[0].rise_rate;
+          function rateColor(rate) {{
+            const t = Math.min(rate / maxRate, 1);
+            const hue = 6;
+            const sat = 70 + t * 25;
+            const lgt = 48 - t * 20;
+            return `hsl(${{hue}},${{sat}}%,${{lgt}}%)`;
+          }}
+
+          const rects = squarify(items, 0, 0, W, H);
+
+          rects.forEach((r, idx) => {{
+            const it = r.item;
+            const block = document.createElement('div');
+            block.className = 'treemap-block';
+            block.style.left   = r.x + 'px';
+            block.style.top    = r.y + 'px';
+            block.style.width  = Math.max(r.w - 2, 1) + 'px';
+            block.style.height = Math.max(r.h - 2, 1) + 'px';
+            block.style.background = rateColor(it.rise_rate);
+
+            // 구+동 표기
+            const sigungu = it.sigungu.replace(/\(.*?\)/g, '').trim();
+            const regionLabel = (sigungu + ' ' + (it.location_dong || '')).trim();
+
+            // 상승률 비례 글씨 크기 (최대/최소 비율 기준)
+            const rateRatio = it.rise_rate / maxRate;
+            const minDim = Math.min(r.w, r.h);
+            const baseFont = minDim * (0.10 + rateRatio * 0.08);
+            const regionFs = Math.max(8,  Math.min(12, baseFont * 0.70));
+            const nameFs   = Math.max(9,  Math.min(16, baseFont * 0.90));
+            const rateFs   = Math.max(11, Math.min(22, baseFont * 1.15));
+            const absFs    = Math.max(8,  Math.min(13, baseFont * 0.75));
+            const inc = it.price - it.old_price;
+            const incStr = inc >= 10000
+              ? `+${{(inc/10000).toFixed(1)}}억`
+              : `+${{inc.toLocaleString()}}만`;
+            if (minDim > 50) {{
+              block.innerHTML = `
+                <div class="treemap-region" style="font-size:${{regionFs}}px">${{regionLabel}}</div>
+                <div class="treemap-name"   style="font-size:${{nameFs}}px">${{it.name}}</div>
+                <div class="treemap-rate"   style="font-size:${{rateFs}}px">+${{it.rise_rate}}%</div>
+                <div style="font-size:${{absFs}}px;color:rgba(255,255,255,0.85);font-weight:600;">${{incStr}}</div>
+              `;
+            }} else if (minDim > 28) {{
+              block.innerHTML = `
+                <div class="treemap-name" style="font-size:${{Math.max(8,nameFs*0.8)}}px;color:#fff;font-weight:700;text-align:center;padding:2px;">${{it.name}}</div>
+                <div style="font-size:${{Math.max(9,rateFs*0.8)}}px;color:#fff;font-weight:800;">+${{it.rise_rate}}%</div>
+              `;
+            }}
+
+            // 툴팁
+            block.addEventListener('mouseenter', e => {{
+              tooltip.style.display = 'block';
+              const sigunguFull = it.sigungu.replace(/\(.*?\)/g, '').trim();
+              tooltip.innerHTML = `
+                <div style="font-weight:700;font-size:14px;margin-bottom:4px;">${{it.name}}</div>
+                <div style="color:#9ca3af;">${{sigunguFull}} ${{it.location_dong}}</div>
+                <div style="margin-top:6px;">신고가: <b>${{it.price.toLocaleString()}}만원</b></div>
+                <div>직전 최고가: ${{it.old_price.toLocaleString()}}만원</div>
+                <div style="color:#4ade80;font-weight:700;font-size:15px;margin-top:4px;">▲ +${{it.rise_rate}}% 상승</div>
+                <div style="color:#9ca3af;font-size:12px;">${{it.date}} | ${{it.floor}}층 | ${{it.area}}㎡</div>
+              `;
+            }});
+            block.addEventListener('mousemove', e => {{
+              tooltip.style.left = (e.clientX + 14) + 'px';
+              tooltip.style.top  = (e.clientY - 10) + 'px';
+            }});
+            block.addEventListener('mouseleave', () => {{ tooltip.style.display = 'none'; }});
+
+            container.appendChild(block);
+          }});
+        }}
+
         // 그래프 버튼 클릭 이벤트
         document.getElementById('chip-quintile-graph').addEventListener('click', openQuintileModal);
 
         // 비교단지 묶기 버튼 클릭 이벤트
         document.getElementById('chip-compare').addEventListener('click', openCompareModal);
+
+        // 트리맵 버튼 클릭 이벤트
+        document.getElementById('chip-treemap').addEventListener('click', openTreemapModal);
 
         // 모달 배경 클릭 시 닫기
         window.onclick = function(event) {{
@@ -7893,6 +8179,10 @@ class RealEstateMonitorApp:
           }}
           if (event.target === compareModal) {{
             closeCompareModal();
+          }}
+          const treemapModal = document.getElementById('treemapModal');
+          if (event.target === treemapModal) {{
+            closeTreemapModal();
           }}
         }};
 

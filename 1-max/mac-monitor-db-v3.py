@@ -412,6 +412,10 @@ class RealEstateMonitorApp:
 
         # 마지막 지역별 갱신 결과 저장 (신고가 HTML 재생성용)
         self._last_regional_results = []  # [(list_name, apt_list), ...]
+
+        # 지역(리스트)별 신고가 단지명 집합 (트리뷰 핑크 표시용)
+        # {list_name: set(apt_names)} — 신고가가 없으면 이전 값 유지, 있으면 새 값으로 교체
+        self._region_new_high_names = {}
         
         # API 키 설정 (환경변수로 빼는 것을 권장)
         self.service_key = "Vs5lXsSo6iEI8no3pP%2FT0udWF9s7Cc8oP1SIWnEI5F4h6dKq92fLvnKmxkoWGJxSeW2%2FSOLQECGxOJzWcjJEXQ%3D%3D"
@@ -1214,6 +1218,11 @@ class RealEstateMonitorApp:
                         if 'html_download_path' in settings_data:
                             self.html_download_path = settings_data['html_download_path']
                             logging.info(f"설정에서 HTML 저장 경로 로드: {self.html_download_path}")
+                        # 지역별 신고가 핑크 단지 복원
+                        if 'region_new_high_names' in settings_data:
+                            raw = settings_data['region_new_high_names']
+                            self._region_new_high_names = {k: set(v) for k, v in raw.items()}
+                            logging.info(f"설정에서 지역별 신고가 핑크 단지 로드: {list(raw.keys())}")
                 except Exception as e:
                     logging.error(f"설정 파일 불러오기 중 오류: {str(e)}")
         except Exception as e:
@@ -3644,7 +3653,8 @@ class RealEstateMonitorApp:
                 'active_list': self.active_list.get(),
                 'last_search_region': self.last_search_region,
                 'kb_excel_path': self.kb_excel_path,
-                'html_download_path': self.html_download_path
+                'html_download_path': self.html_download_path,
+                'region_new_high_names': {k: list(v) for k, v in self._region_new_high_names.items()}
             }
             with open(os.path.join(os.getcwd(), 'monitor_settings.json'), 'w', encoding='utf-8') as f:
                 json.dump(settings_data, f, ensure_ascii=False, indent=2)
@@ -3746,27 +3756,20 @@ class RealEstateMonitorApp:
                 apt.get("last_update", "업데이트 필요")
             ))
     
-            # ★★★ 핑크색 표시: 최근 7일 이내에 신고가가 갱신된 단지만 ★★★
-            if prev_max_price > 0 and last_max_price > prev_max_price:
-                # last_update 시간 확인 (최근 7일 이내만 핑크색)
-                last_update_str = apt.get('last_update', '')
-                is_recent = False
-                if last_update_str:
-                    try:
-                        last_update_time = datetime.strptime(last_update_str, '%Y-%m-%d %H:%M')
-                        days_diff = (datetime.now() - last_update_time).days
-                        if days_diff <= 7:  # 7일 이내
-                            is_recent = True
-                    except:
-                        pass
-
-                if is_recent:
-                    self.apt_tree.item(item_id, tags=('price_up',))
+            # ★★★ 핑크색 표시: 지역별 마지막 갱신 신고가 단지 (신고가 없으면 이전 유지) ★★★
+            active = self.active_list.get()
+            if active == self.UNIFIED_LIST_NAME:
+                pink_set = set().union(*self._region_new_high_names.values()) if self._region_new_high_names else set()
+            else:
+                pink_set = self._region_new_high_names.get(active, set())
+            apt_name_key = apt.get('apt_name', '')
+            if apt_name_key in pink_set:
+                self.apt_tree.item(item_id, tags=('price_up',))
             elif prev_max_price > 0 and last_max_price < prev_max_price:
                 self.apt_tree.item(item_id, tags=('price_down',))
     
-        self.apt_tree.tag_configure('price_up', background='#FFDDDD', foreground='#3AA6FF')
-        self.apt_tree.tag_configure('price_down', background='#DDDDFF')
+        self.apt_tree.tag_configure('price_up', background='#FF9999', foreground='#111111')
+        self.apt_tree.tag_configure('price_down', background='#AAAAEE', foreground='#111111')
     
         # 결과 개수 표시
         try:
@@ -5636,20 +5639,24 @@ class RealEstateMonitorApp:
             self.status_var.set(f"★ 전체 통합 갱신 완료 ({len(real_lists)}개 리스트)")
             # 마지막 지역별 결과 저장 (HTML 재생성 버튼에서 활용)
             self._last_regional_results = regional_results
-            # 지역별로 순차적으로 신고가 팝업 표시
-            for list_name, apt_list in regional_results:
-                self.active_list.set(list_name)
-                win = self.show_new_max_notification(apt_list)
-                if win is not None:
-                    try:
-                        self.root.wait_window(win)
-                    except Exception:
-                        pass
-            # 팝업 완료 후 active_list 복원
-            self.active_list.set(prev_list)
-            # 신고가 발생 지역이 있으면 HTML 재생성 안내 다이얼로그
-            if regional_results:
-                self._show_regional_html_dialog(regional_results)
+
+            def _show_unified_popups(rr=regional_results, pl=prev_list):
+                for list_name, apt_list in rr:
+                    self.active_list.set(list_name)
+                    win = self.show_new_max_notification(apt_list)
+                    if win is not None:
+                        try:
+                            self.root.wait_window(win)
+                        except Exception:
+                            pass
+                self.active_list.set(pl)
+                if rr:
+                    self._show_regional_html_dialog(rr)
+
+            if threading.current_thread() != threading.main_thread():
+                self.root.after(0, _show_unified_popups)
+            else:
+                _show_unified_popups()
             return
 
         if not self.monitored_apts:
@@ -5806,6 +5813,24 @@ class RealEstateMonitorApp:
                 logging.error(f"{apt_info['apt_name']} 데이터 갱신 중 오류: {str(e)}")
                 continue
         
+        # 지역별 신고가 dict 업데이트: 이번 갱신에서 신고가가 있으면 해당 지역만 교체
+        current_list = self.active_list.get()
+        if apt_with_new_max:
+            self._region_new_high_names[current_list] = {a['apt_name'] for a in apt_with_new_max}
+            # 변경 즉시 settings 파일에 영속 저장
+            try:
+                settings_file = os.path.join(os.getcwd(), 'monitor_settings.json')
+                sd = {}
+                if os.path.exists(settings_file):
+                    with open(settings_file, 'r', encoding='utf-8') as _f:
+                        sd = json.load(_f)
+                sd['region_new_high_names'] = {k: list(v) for k, v in self._region_new_high_names.items()}
+                with open(settings_file, 'w', encoding='utf-8') as _f:
+                    json.dump(sd, _f, ensure_ascii=False, indent=2)
+            except Exception as _e:
+                logging.error(f'지역별 신고가 저장 오류: {_e}')
+        # 신고가 없으면 해당 지역의 이전 핑크 집합 그대로 유지
+
         self.save_monitored_apts()
         self.update_apt_tree()
         
@@ -5847,7 +5872,12 @@ class RealEstateMonitorApp:
                 # 전체 통합 모드: 팝업 없이 결과 수집만
                 _collect_for_unified.extend(apt_with_new_max)
             else:
-                self.show_new_max_notification(apt_with_new_max)
+                if is_auto_update:
+                    # 자동 업데이트(백그라운드 스레드): 메인 스레드로 위임
+                    apts_copy = list(apt_with_new_max)
+                    self.root.after(0, lambda a=apts_copy: self.show_new_max_notification(a))
+                else:
+                    self.show_new_max_notification(apt_with_new_max)
 
         # 평형별 순위 이력 저장
         self.save_area_ranking_history()
@@ -5865,6 +5895,7 @@ class RealEstateMonitorApp:
         update_time = datetime.now().strftime('%Y-%m-%d %H:%M')
         if is_auto_update:
             logging.info(f"자동 업데이트 완료: {update_time}")
+            self.root.after(0, lambda t=update_time: self.status_var.set(f"자동 업데이트 완료: {t}"))
         else:
             self.status_var.set(f"데이터 갱신 완료: {update_time}")
         
@@ -13697,34 +13728,36 @@ function closeChartModal() {
 
     def show_notification_html_by_region(self):
         """신고가 HTML 재생성 버튼 핸들러.
-        마지막으로 저장된 지역별 결과(_last_regional_results)가 있으면 그것을 사용,
-        없으면 최근 notifications_history에서 지역별로 재구성하여 다이얼로그 표시.
+        우선순위:
+          1. _region_new_high_names (핑크 명암 단지) — DB에서 최신 거래 정보 조합
+          2. _last_regional_results (이번 세션 갱신 결과)
+          3. notifications_history fallback
         """
+        # ── 1순위: 핑크 명암 단지 기준 (앱 재시작 후에도 동작) ──
+        if self._region_new_high_names:
+            regional_results = self._build_regional_results_from_pink()
+            if regional_results:
+                self._show_regional_html_dialog(regional_results)
+                return
+
+        # ── 2순위: 이번 세션 갱신 결과 ──
         if self._last_regional_results:
             self._show_regional_html_dialog(self._last_regional_results)
             return
 
-        # _last_regional_results가 없는 경우: notifications_history에서 재구성
+        # ── 3순위: notifications_history fallback ──
         if not self.notifications_history:
             messagebox.showinfo("알림", "저장된 신고가 데이터가 없습니다.\n먼저 데이터 갱신을 실행하세요.")
             return
 
-        # 가장 최근 notification group의 apt_list를 리스트명별로 분류
-        # 각 apt에는 sido, sigungu 정보가 있으므로 이를 이용해 리스트 이름에 매핑
         real_lists = [name for name in self.monitored_lists["lists"].keys()
                       if name != self.UNIFIED_LIST_NAME]
-
-        # 최근 그룹부터 역순으로 최대 5개 그룹을 합산하여 지역별 재구성
-        combined = {}  # list_name → [apt_info, ...]
+        combined = {}
         for group in reversed(self.notifications_history[-5:]):
             for apt in group.get("apt_list", []):
-                sido = apt.get("sido", "")
-                sigungu = apt.get("sigungu", "")
-                # 어떤 리스트에 속하는지 판별
                 matched = None
                 for lname in real_lists:
-                    apts_in_list = self.monitored_lists["lists"].get(lname, [])
-                    for a in apts_in_list:
+                    for a in self.monitored_lists["lists"].get(lname, []):
                         if a.get("apt_name") == apt.get("apt_name"):
                             matched = lname
                             break
@@ -13733,7 +13766,6 @@ function closeChartModal() {
                 if matched is None:
                     matched = real_lists[0] if real_lists else "기본"
                 combined.setdefault(matched, [])
-                # 중복 방지
                 existing_names = [x.get("apt_name") for x in combined[matched]]
                 if apt.get("apt_name") not in existing_names:
                     combined[matched].append(apt)
@@ -13744,6 +13776,62 @@ function closeChartModal() {
 
         regional_results = [(ln, apts) for ln, apts in combined.items() if apts]
         self._show_regional_html_dialog(regional_results)
+
+    def _build_regional_results_from_pink(self):
+        """_region_new_high_names(핑크 단지명 집합)를 기반으로
+        DB에서 거래 정보를 조회해 지역별 apt_list를 구성한다."""
+        regional_results = []
+        try:
+            cursor = self.db_conn.cursor()
+            for list_name, pink_names in self._region_new_high_names.items():
+                if not pink_names:
+                    continue
+                # 해당 리스트 ID 조회
+                cursor.execute("SELECT id FROM monitoring_lists WHERE name = ?", (list_name,))
+                row = cursor.fetchone()
+                if not row:
+                    continue
+                list_id = row[0]
+
+                apt_list = []
+                for apt_name in pink_names:
+                    # LIMIT 없이 전체 조회: 같은 단지명이라도 면적별 행이 여러 개일 수 있음
+                    cursor.execute("""
+                        SELECT apt_name, area,
+                               prev_max_price, prev_max_date, prev_max_floor,
+                               last_max_price, max_price_date, max_price_floor,
+                               sido, sigungu, dong, build_year
+                        FROM apartments
+                        WHERE list_id = ? AND apt_name = ?
+                        ORDER BY last_max_price DESC
+                    """, (list_id, apt_name))
+                    rows = cursor.fetchall()
+                    for r in rows:
+                        (name, area, old_price, old_date, old_floor,
+                         new_price, new_date, new_floor,
+                         sido, sigungu, dong, build_year) = r
+                        if not new_price:
+                            continue
+                        apt_list.append({
+                            'apt_name':      name,
+                            'area':          area or '',
+                            'old_price':     old_price or 0,
+                            'old_date':      old_date or '',
+                            'old_floor':     old_floor or '',
+                            'new_price':     new_price,
+                            'date':          new_date or '',
+                            'floor':         new_floor or '',
+                            'sido':          sido or '',
+                            'sigungu':       sigungu or '',
+                            'location_dong': dong or '',
+                            'build_year':    build_year or '',
+                        })
+
+                if apt_list:
+                    regional_results.append((list_name, apt_list))
+        except Exception as e:
+            logging.error(f"핑크 단지 기반 regional_results 구성 오류: {e}")
+        return regional_results
 
     def on_closing(self):
         """프로그램 종료 시 처리"""

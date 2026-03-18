@@ -6048,7 +6048,7 @@ class RealEstateMonitorApp:
                         sigungu_clean = "성남시 중원구"
                 # 용인시 특정 동 매핑
                 elif sido == "경기도" and "용인시" in sigungu:
-                    if location_dong == "보정동":
+                    if location_dong in ["보정동", "언남동"]:
                         sigungu_clean = "용인시 기흥구"
                     elif location_dong in ["김량장동", "고림동"] or location_dong.startswith("이동읍"):
                         sigungu_clean = "용인시 처인구"
@@ -6141,7 +6141,7 @@ class RealEstateMonitorApp:
             # 용인시, 고양시, 수원시 특정 동 매핑
             region_for_filter = sigungu.split('(')[0] if '(' in sigungu else sigungu
             if sido == "경기도" and "용인시" in sigungu:
-                if location_dong == "보정동":
+                if location_dong in ["보정동", "언남동"]:
                     region_for_filter = "용인시 기흥구"
                 elif location_dong in ["김량장동", "고림동"] or location_dong.startswith("이동읍"):
                     region_for_filter = "용인시 처인구"

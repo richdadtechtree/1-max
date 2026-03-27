@@ -2728,6 +2728,7 @@ class RealEstateMonitorApp:
         ttk.Button(btns, text="데이터 갱신", style='Accent.TButton', command=self.update_all_data).pack(side="right", padx=5)
         ttk.Button(btns, text="📄 신고가 HTML", style='Accent.TButton', command=self.show_notification_html_by_region).pack(side="right", padx=5)
         ttk.Button(btns, text="🔍 신고가 다시 찾기", style='Accent.TButton', command=self.recheck_max_prices).pack(side="right", padx=5)
+        ttk.Button(btns, text="🗂️ 일괄 HTML 다운로드", style='Accent.TButton', command=self.show_batch_html_download_dialog).pack(side="right", padx=5)
         ttk.Button(btns, text="📈 가격대별 분위", style='Accent.TButton', command=self.export_price_distribution_html).pack(side="right", padx=5)
         self.btn_fear_greed = ttk.Button(btns, text="🧭 부동산 최신 근황", style='Accent.TButton', command=self.export_fear_greed_html)
         self.btn_fear_greed.pack(side="right", padx=5)
@@ -11975,6 +11976,238 @@ function closeChartModal() {
 
         dialog.wait_window()
         return result["value"]
+
+    # ═══════════════════════════════════════════════════════════
+    # v4 신규: 일괄 HTML 다운로드 (부동산 최신 근황 + 가격대별 분위)
+    # ═══════════════════════════════════════════════════════════
+
+    def _region_label_from_list_name(self, list_name):
+        """리스트 이름으로 파일명용 지역 레이블 반환"""
+        if "서울" in list_name and "수도권" in list_name:
+            return "서울&수도권"
+        if "서울" in list_name:
+            return "서울"
+        if "경기" in list_name:
+            return "경기"
+        if "인천" in list_name:
+            return "인천"
+        if "대구" in list_name:
+            return "대구"
+        if "부산" in list_name:
+            return "부산"
+        if "광주" in list_name:
+            return "광주"
+        if "대전" in list_name:
+            return "대전"
+        if "울산" in list_name:
+            return "울산"
+        return list_name.replace(" ", "_")
+
+    def _batch_export_fear_greed_silent(self, list_name):
+        """부동산 최신 근황 HTML을 지역별 파일명으로 저장 (메시지박스·파일열기 없음)"""
+        try:
+            kb_analysis = self.analyze_kb_excel()
+            hotplace_region, hotplace_rate = '', ''
+            if kb_analysis and kb_analysis.get('weekly_top3'):
+                top1 = kb_analysis['weekly_top3'][0]
+                hotplace_region = top1[0]
+                hotplace_rate = f"{top1[1]:.2f}"
+            html_str = self.build_fear_greed_html(
+                hotplace_region=hotplace_region,
+                hotplace_rate=hotplace_rate,
+                kb_analysis=kb_analysis
+            )
+            if not html_str:
+                return None
+            region_label = self._region_label_from_list_name(list_name)
+            newtrade_dir = os.path.join(self.html_download_path, "newtrade")
+            os.makedirs(newtrade_dir, exist_ok=True)
+            filepath = os.path.join(newtrade_dir, f"{region_label}_부동산근황.html")
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(html_str)
+            return filepath
+        except Exception as e:
+            logging.error(f"[일괄 부동산근황] {list_name} 오류: {e}")
+            return None
+
+    def _batch_export_price_distribution_silent(self, list_name):
+        """가격대별 분위 HTML을 리스트별 파일명으로 저장 (메시지박스·파일열기 없음)"""
+        try:
+            html_str = self.build_price_distribution_html(region_filter=None)
+            if not html_str:
+                return None
+            region_label = self._region_label_from_list_name(list_name)
+            save_dir = os.path.join(self.html_download_path, "newtrade")
+            os.makedirs(save_dir, exist_ok=True)
+            filepath = os.path.join(save_dir, f"{region_label} 최근 거래량 금액대 분포.html")
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(html_str)
+            return filepath
+        except Exception as e:
+            logging.error(f"[일괄 가격분위] {list_name} 오류: {e}")
+            return None
+
+    def show_batch_html_download_dialog(self):
+        """일괄 HTML 다운로드 다이얼로그
+        - 부동산 최신 근황: 지역 선택 없이 1회 다운로드
+        - 가격대별 분위: 체크박스로 지역(리스트) 선택 후 각각 다운로드
+        """
+        try:
+            cursor = self.db_conn.cursor()
+            cursor.execute("SELECT name FROM monitoring_lists ORDER BY id")
+            all_lists = [r[0] for r in cursor.fetchall()]
+        except Exception:
+            all_lists = list(self.monitored_lists.get("lists", {}).keys())
+
+        all_lists = [n for n in all_lists if n != self.UNIFIED_LIST_NAME]
+
+        if not all_lists:
+            messagebox.showwarning("알림", "등록된 모니터링 리스트가 없습니다.")
+            return
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("🗂️ 일괄 HTML 다운로드")
+        dialog.resizable(False, False)
+        dialog.configure(bg=self.palette['surface'])
+        dialog.grab_set()
+
+        main = ttk.Frame(dialog)
+        main.pack(fill='both', padx=15, pady=15)
+
+        # ── ① 부동산 최신 근황 (지역 선택 없음, 단일 다운로드) ──
+        fear_frame = ttk.LabelFrame(main, text="부동산 최신 근황", padding=10)
+        fear_frame.pack(fill='x', pady=(0, 8))
+        var_fear = tk.BooleanVar(value=True)
+        ttk.Checkbutton(fear_frame, text="🧭 부동산 최신 근황 다운로드 (지역 선택 없음, 1회 생성)",
+                        variable=var_fear).pack(anchor='w')
+
+        # ── ② 가격대별 분위 + 지역 선택 ──
+        dist_outer = ttk.LabelFrame(main, text="가격대별 분위", padding=10)
+        dist_outer.pack(fill='x', pady=(0, 8))
+
+        var_dist = tk.BooleanVar(value=True)
+        ttk.Checkbutton(dist_outer, text="📈 가격대별 분위 다운로드 (아래 지역별로 각각 생성)",
+                        variable=var_dist).pack(anchor='w')
+
+        list_frame = ttk.Frame(dist_outer)
+        list_frame.pack(fill='x', padx=10, pady=(6, 0))
+
+        check_vars = {}
+        for name in all_lists:
+            var = tk.BooleanVar(value=True)
+            check_vars[name] = var
+            ttk.Checkbutton(list_frame, text=name, variable=var).pack(anchor='w', pady=1)
+
+        sel_frame = ttk.Frame(list_frame)
+        sel_frame.pack(anchor='w', pady=(4, 0))
+        ttk.Button(sel_frame, text="전체 선택", width=10,
+                   command=lambda: [v.set(True) for v in check_vars.values()]).pack(side='left', padx=(0, 4))
+        ttk.Button(sel_frame, text="전체 해제", width=10,
+                   command=lambda: [v.set(False) for v in check_vars.values()]).pack(side='left')
+
+        def _toggle_list_frame(*_):
+            state = 'normal' if var_dist.get() else 'disabled'
+            for w in list_frame.winfo_children():
+                try:
+                    w.configure(state=state)
+                except Exception:
+                    pass
+                for ww in w.winfo_children() if hasattr(w, 'winfo_children') else []:
+                    try:
+                        ww.configure(state=state)
+                    except Exception:
+                        pass
+
+        var_dist.trace_add('write', _toggle_list_frame)
+
+        # ── 진행 상태 ──
+        prog_frame = ttk.LabelFrame(main, text="진행 상태", padding=8)
+        prog_frame.pack(fill='x', pady=(0, 8))
+        status_var = tk.StringVar(value="대기 중...")
+        ttk.Label(prog_frame, textvariable=status_var, wraplength=310).pack(anchor='w')
+        progress_var = tk.DoubleVar(value=0)
+        ttk.Progressbar(prog_frame, variable=progress_var, maximum=100, length=310).pack(fill='x', pady=(4, 0))
+
+        # ── 버튼 ──
+        btn_frame = ttk.Frame(main)
+        btn_frame.pack(pady=(4, 0))
+        start_btn = ttk.Button(btn_frame, text="▶ 다운로드 시작", style='Accent.TButton')
+        start_btn.pack(side='left', padx=(0, 8))
+        ttk.Button(btn_frame, text="닫기", command=dialog.destroy).pack(side='left')
+
+        def on_start():
+            do_fear = var_fear.get()
+            do_dist = var_dist.get()
+
+            if not do_fear and not do_dist:
+                messagebox.showwarning("알림", "다운로드 항목을 1개 이상 선택하세요.", parent=dialog)
+                return
+
+            selected_lists = [n for n, v in check_vars.items() if v.get()] if do_dist else []
+            if do_dist and not selected_lists:
+                messagebox.showwarning("알림", "가격대별 분위를 선택했다면 지역을 1개 이상 선택하세요.", parent=dialog)
+                return
+
+            start_btn.state(['disabled'])
+
+            # 작업 목록: fear는 1건, dist는 리스트 수만큼
+            tasks = []
+            if do_fear:
+                tasks.append(('fear', None))
+            for lst in selected_lists:
+                tasks.append(('dist', lst))
+
+            total = len(tasks)
+            saved = []
+            errors = []
+            orig_list = self.active_list.get()
+
+            for i, (typ, lst) in enumerate(tasks):
+                if typ == 'fear':
+                    status_var.set(f"[{i+1}/{total}] 부동산 최신 근황 생성 중...")
+                else:
+                    status_var.set(f"[{i+1}/{total}] {lst} — 가격대별 분위 생성 중...")
+                progress_var.set(i / total * 100)
+                dialog.update_idletasks()
+
+                try:
+                    if typ == 'fear':
+                        fp = self._batch_export_fear_greed_silent(orig_list)
+                    else:
+                        self.active_list.set(lst)
+                        fp = self._batch_export_price_distribution_silent(lst)
+                    if fp:
+                        saved.append(os.path.basename(fp))
+                    else:
+                        label = '부동산 최신 근황' if typ == 'fear' else lst
+                        errors.append(f"{label}: 데이터 없음")
+                except Exception as e:
+                    label = '부동산 최신 근황' if typ == 'fear' else lst
+                    errors.append(f"{label}: {e}")
+                    logging.error(f"[일괄 다운로드] {label} 오류: {e}")
+
+            self.active_list.set(orig_list)
+            progress_var.set(100)
+            status_var.set(f"완료 — {len(saved)}개 저장, 오류 {len(errors)}건")
+            start_btn.state(['!disabled'])
+
+            save_dir = os.path.join(self.html_download_path, "newtrade")
+            msg = f"✅ {len(saved)}개 파일 저장 완료\n📁 저장 위치: {save_dir}"
+            if saved:
+                msg += "\n\n저장된 파일:\n" + "\n".join(f"  • {f}" for f in saved)
+            if errors:
+                msg += f"\n\n⚠️ 오류 {len(errors)}건:\n" + "\n".join(f"  • {e}" for e in errors)
+            messagebox.showinfo("일괄 다운로드 완료", msg, parent=dialog)
+            try:
+                open_file_or_folder(save_dir)
+            except Exception:
+                pass
+
+        start_btn.configure(command=on_start)
+
+        dialog.update_idletasks()
+        h = 180 + len(all_lists) * 26 + 220
+        dialog.geometry(f"370x{min(720, h)}")
 
     def _show_list_selection_dialog(self, title="지역 선택"):
         """모든 모니터링 리스트를 체크박스로 선택하는 다이얼로그.

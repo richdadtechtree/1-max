@@ -3315,7 +3315,7 @@ class RealEstateMonitorApp:
 
             dialog = tk.Toplevel(self.root)
             dialog.title("신고가 히스토리 HTML")
-            dialog.geometry("430x300")
+            dialog.geometry("430x340")
             dialog.resizable(False, False)
             dialog.configure(bg=self.palette['surface'])
             dialog.grab_set()
@@ -3419,12 +3419,18 @@ class RealEstateMonitorApp:
             _load_sido_options()
             _load_lists()
 
+            # ── 지역별 분리 저장 체크박스 ──
+            split_var = tk.BooleanVar(value=False)
+            ttk.Checkbutton(dialog, text="지역별 분리 저장 (서울&수도권 1개 + 기타 지역별)",
+                            variable=split_var).grid(row=4, column=0, columnspan=2, sticky='w', padx=15, pady=4)
+
             # ── 다운로드 ──
             def _on_download():
                 sel_date = date_var.get()
                 sel_sido_label = sido_var.get()
                 sel_sigungu = sigungu_var.get()
                 sel_list = list_var.get()
+                do_split = split_var.get()
 
                 sido_filter = [] if sel_sido_label == '전체' else REGION_GROUPS.get(sel_sido_label, [sel_sido_label])
 
@@ -3450,10 +3456,8 @@ class RealEstateMonitorApp:
                     messagebox.showwarning("결과 없음", f"{sel_date} / {sel_sido_label} 조건의 신고가 데이터가 없습니다.")
                     return
 
-                apt_list = []
-                for row in rows:
-                    r = dict(zip(cols, row))
-                    apt_list.append({
+                def _row_to_apt(r):
+                    return {
                         'apt_name': r['apt_name'],
                         'area': r['area'] or '',
                         'sido': r['sido'] or '',
@@ -3472,26 +3476,70 @@ class RealEstateMonitorApp:
                         'region_59_rank': r['region_59_rank'],
                         'region_name': r['region_name'] or '',
                         'is_young': False,
-                    })
+                    }
 
                 ts = sel_date.replace('-', '')
-                region_part = f"_{sel_sido_label}" if sel_sido_label != '전체' else ''
-                if sel_sigungu != '전체':
-                    region_part += f"_{sel_sigungu}"
-                fixed_name = f"신고가_히스토리_{ts}{region_part}.html"
-                region_display = sel_sigungu if sel_sigungu != '전체' else (sel_sido_label if sel_sido_label != '전체' else None)
 
-                dialog.destroy()
-                self.export_notification_html(
-                    apt_list,
-                    ask_path=False,
-                    silent=False,
-                    fixed_filename=fixed_name,
-                    region_name=region_display
-                )
+                if do_split:
+                    # 서울+경기+인천 → 수도권 1개, 나머지 sido는 각각 별도 파일
+                    SUDO_SIDOS = {'서울특별시', '경기도', '인천광역시'}
+                    SUDO_LABEL = '서울&수도권'
+                    from collections import defaultdict
+                    region_map = defaultdict(list)
+                    for row in rows:
+                        r = dict(zip(cols, row))
+                        sido = r.get('sido', '') or ''
+                        if sido in SUDO_SIDOS:
+                            region_map[SUDO_LABEL].append(r)
+                        elif sido:
+                            region_map[sido].append(r)
+
+                    if not region_map:
+                        messagebox.showwarning("결과 없음", "데이터가 없습니다.")
+                        return
+
+                    dialog.destroy()
+                    saved_files = []
+                    for region_label, region_rows in region_map.items():
+                        apt_list = [_row_to_apt(r) for r in region_rows]
+                        safe_region = region_label.replace('/', '_').replace(' ', '_').replace('&', '_')
+                        fixed_name = f"신고가_히스토리_{ts}_{safe_region}.html"
+                        filepath = self.export_notification_html(
+                            apt_list,
+                            ask_path=False,
+                            silent=True,
+                            fixed_filename=fixed_name,
+                            region_name=region_label
+                        )
+                        if filepath:
+                            saved_files.append(filepath)
+
+                    if saved_files:
+                        file_list = '\n'.join(os.path.basename(f) for f in saved_files)
+                        messagebox.showinfo("저장 완료",
+                            f"{len(saved_files)}개 지역별 HTML 파일이 저장되었습니다.\n\n{file_list}")
+                        open_file_or_folder(os.path.dirname(saved_files[0]))
+                    else:
+                        messagebox.showwarning("저장 실패", "저장된 파일이 없습니다.")
+                else:
+                    apt_list = [_row_to_apt(dict(zip(cols, row))) for row in rows]
+                    region_part = f"_{sel_sido_label}" if sel_sido_label != '전체' else ''
+                    if sel_sigungu != '전체':
+                        region_part += f"_{sel_sigungu}"
+                    fixed_name = f"신고가_히스토리_{ts}{region_part}.html"
+                    region_display = sel_sigungu if sel_sigungu != '전체' else (sel_sido_label if sel_sido_label != '전체' else None)
+
+                    dialog.destroy()
+                    self.export_notification_html(
+                        apt_list,
+                        ask_path=False,
+                        silent=False,
+                        fixed_filename=fixed_name,
+                        region_name=region_display
+                    )
 
             btn_frame = ttk.Frame(dialog)
-            btn_frame.grid(row=4, column=0, columnspan=2, pady=15)
+            btn_frame.grid(row=5, column=0, columnspan=2, pady=10)
             ttk.Button(btn_frame, text="HTML 다운로드", style='Accent.TButton',
                        command=_on_download).pack(side='left', padx=8)
             ttk.Button(btn_frame, text="닫기",
@@ -12004,7 +12052,7 @@ function closeChartModal() {
         return list_name.replace(" ", "_")
 
     def _batch_export_fear_greed_silent(self, list_name):
-        """부동산 최신 근황 HTML을 지역별 파일명으로 저장 (메시지박스·파일열기 없음)"""
+        """부동산 최신 근황 HTML 저장 — 원본과 동일하게 index.html로 저장 (메시지박스·파일열기 없음)"""
         try:
             kb_analysis = self.analyze_kb_excel()
             hotplace_region, hotplace_rate = '', ''
@@ -12019,10 +12067,9 @@ function closeChartModal() {
             )
             if not html_str:
                 return None
-            region_label = self._region_label_from_list_name(list_name)
             newtrade_dir = os.path.join(self.html_download_path, "newtrade")
             os.makedirs(newtrade_dir, exist_ok=True)
-            filepath = os.path.join(newtrade_dir, f"{region_label}_부동산근황.html")
+            filepath = os.path.join(newtrade_dir, "index.html")
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(html_str)
             return filepath
@@ -12030,21 +12077,33 @@ function closeChartModal() {
             logging.error(f"[일괄 부동산근황] {list_name} 오류: {e}")
             return None
 
-    def _batch_export_price_distribution_silent(self, list_name):
-        """가격대별 분위 HTML을 리스트별 파일명으로 저장 (메시지박스·파일열기 없음)"""
+    def _batch_export_price_distribution_silent(self, list_name, region_filter=None):
+        """가격대별 분위 HTML 저장 — 원본 export_price_distribution_html과 동일한 파일명 (메시지박스·파일열기 없음)"""
         try:
-            html_str = self.build_price_distribution_html(region_filter=None)
+            html_str = self.build_price_distribution_html(region_filter=region_filter)
             if not html_str:
                 return None
-            region_label = self._region_label_from_list_name(list_name)
+            # 원본 export_price_distribution_html과 동일한 region_name 결정 로직
+            if region_filter:
+                region_name = region_filter
+            elif list_name == self.UNIFIED_LIST_NAME:
+                region_name = "전체"
+            elif "서울" in list_name and "수도권" in list_name:
+                region_name = "서울&수도권"
+            elif "대구" in list_name:
+                region_name = "대구"
+            elif "부산" in list_name:
+                region_name = "부산"
+            else:
+                region_name = list_name.replace(" ", "_")
             save_dir = os.path.join(self.html_download_path, "newtrade")
             os.makedirs(save_dir, exist_ok=True)
-            filepath = os.path.join(save_dir, f"{region_label} 최근 거래량 금액대 분포.html")
+            filepath = os.path.join(save_dir, f"{region_name} 최근 거래량 금액대 분포.html")
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(html_str)
             return filepath
         except Exception as e:
-            logging.error(f"[일괄 가격분위] {list_name} 오류: {e}")
+            logging.error(f"[일괄 가격분위] {list_name} region={region_filter} 오류: {e}")
             return None
 
     def show_batch_html_download_dialog(self):
@@ -12151,22 +12210,29 @@ function closeChartModal() {
             start_btn.state(['disabled'])
 
             # 작업 목록: fear는 1건, dist는 리스트 수만큼
+            # 서울수도권 리스트는 서울/경기/인천 3개로 분리
             tasks = []
             if do_fear:
-                tasks.append(('fear', None))
+                tasks.append(('fear', None, None))
             for lst in selected_lists:
-                tasks.append(('dist', lst))
+                if "서울" in lst and "수도권" in lst:
+                    tasks.append(('dist', lst, '서울'))
+                    tasks.append(('dist', lst, '경기'))
+                    tasks.append(('dist', lst, '인천'))
+                else:
+                    tasks.append(('dist', lst, None))
 
             total = len(tasks)
             saved = []
             errors = []
             orig_list = self.active_list.get()
 
-            for i, (typ, lst) in enumerate(tasks):
+            for i, (typ, lst, region_filter) in enumerate(tasks):
                 if typ == 'fear':
                     status_var.set(f"[{i+1}/{total}] 부동산 최신 근황 생성 중...")
                 else:
-                    status_var.set(f"[{i+1}/{total}] {lst} — 가격대별 분위 생성 중...")
+                    region_label = region_filter if region_filter else lst
+                    status_var.set(f"[{i+1}/{total}] {region_label} — 가격대별 분위 생성 중...")
                 progress_var.set(i / total * 100)
                 dialog.update_idletasks()
 
@@ -12175,14 +12241,14 @@ function closeChartModal() {
                         fp = self._batch_export_fear_greed_silent(orig_list)
                     else:
                         self.active_list.set(lst)
-                        fp = self._batch_export_price_distribution_silent(lst)
+                        fp = self._batch_export_price_distribution_silent(lst, region_filter=region_filter)
                     if fp:
                         saved.append(os.path.basename(fp))
                     else:
-                        label = '부동산 최신 근황' if typ == 'fear' else lst
+                        label = '부동산 최신 근황' if typ == 'fear' else (region_filter or lst)
                         errors.append(f"{label}: 데이터 없음")
                 except Exception as e:
-                    label = '부동산 최신 근황' if typ == 'fear' else lst
+                    label = '부동산 최신 근황' if typ == 'fear' else (region_filter or lst)
                     errors.append(f"{label}: {e}")
                     logging.error(f"[일괄 다운로드] {label} 오류: {e}")
 

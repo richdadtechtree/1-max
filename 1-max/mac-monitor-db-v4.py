@@ -382,6 +382,7 @@ class RealEstateMonitorApp:
         self.last_hotplace_region = ""
         self.last_hotplace_rate = ""
         self.kb_excel_path = ""  # KB 시세 엑셀 파일 경로
+        self.kb_monthly_path = ""  # KB 월간 데이터 파일 경로
 
         # 설정 파일에서 경로 먼저 불러오기 (DB 초기화 전)
         self.load_settings()
@@ -1246,6 +1247,9 @@ class RealEstateMonitorApp:
                         if 'kb_excel_path' in settings_data:
                             self.kb_excel_path = settings_data['kb_excel_path']
                             logging.info(f"설정에서 KB 엑셀 경로 로드: {self.kb_excel_path}")
+                        if 'kb_monthly_path' in settings_data:
+                            self.kb_monthly_path = settings_data['kb_monthly_path']
+                            logging.info(f"설정에서 KB 월간 경로 로드: {self.kb_monthly_path}")
                         if 'html_download_path' in settings_data:
                             self.html_download_path = settings_data['html_download_path']
                             logging.info(f"설정에서 HTML 저장 경로 로드: {self.html_download_path}")
@@ -2528,6 +2532,8 @@ class RealEstateMonitorApp:
         button_frame.pack(side="right", pady=(0, 10))
         ttk.Button(button_frame, text="⚙️ 설정", style='Accent.TButton',
                   command=self.show_settings_dialog).pack(side="right", padx=(0, 5))
+        ttk.Button(button_frame, text="📈 KB 월간 차트", style='Accent.TButton',
+                  command=self.show_kb_monthly_chart).pack(side="right", padx=(0, 5))
         ttk.Button(button_frame, text="💾 캐시", style='Accent.TButton',
                   command=self.show_cache_statistics).pack(side="right", padx=(0, 5))
         ttk.Button(button_frame, text="📅 신고가 히스토리 HTML", style='Accent.TButton',
@@ -2732,6 +2738,7 @@ class RealEstateMonitorApp:
         ttk.Button(btns, text="📈 가격대별 분위", style='Accent.TButton', command=self.export_price_distribution_html).pack(side="right", padx=5)
         self.btn_fear_greed = ttk.Button(btns, text="🧭 부동산 최신 근황", style='Accent.TButton', command=self.export_fear_greed_html)
         self.btn_fear_greed.pack(side="right", padx=5)
+        ttk.Button(btns, text="🏦 KB 데이터 HTML", style='Accent.TButton', command=self.export_kb_html_btn).pack(side="right", padx=5)
         # '서울 수도권' 또는 전체 통합 리스트에서만 활성화
         if self.active_list.get() not in ("서울 수도권", self.UNIFIED_LIST_NAME):
             self.btn_fear_greed.state(['disabled'])
@@ -3884,8 +3891,23 @@ class RealEstateMonitorApp:
                 kb_excel_var.set(path)
         ttk.Button(settings, text="찾아보기", style='Accent.TButton', command=select_kb_excel).grid(row=6, column=2, padx=5, pady=10)
 
+        # KB 월간 데이터 파일 경로
+        ttk.Label(settings, text="KB 월간 데이터 파일:", background=self.palette['surface'], foreground=self.palette['text_primary']).grid(row=7, column=0, sticky="w", padx=10, pady=10)
+        kb_monthly_var = tk.StringVar(value=self.kb_monthly_path)
+        ttk.Entry(settings, textvariable=kb_monthly_var, width=40).grid(row=7, column=1, padx=5, pady=10)
+        def select_kb_monthly():
+            init_dir = os.path.dirname(self.kb_monthly_path) if self.kb_monthly_path else os.path.expanduser("~/Downloads")
+            path = filedialog.askopenfilename(
+                initialdir=init_dir,
+                title="KB 월간 데이터 파일 선택",
+                filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
+            )
+            if path:
+                kb_monthly_var.set(path)
+        ttk.Button(settings, text="찾아보기", style='Accent.TButton', command=select_kb_monthly).grid(row=7, column=2, padx=5, pady=10)
+
         button_frame = ttk.Frame(settings, style='TFrame')
-        button_frame.grid(row=7, column=0, columnspan=3, sticky="e", padx=10, pady=20)
+        button_frame.grid(row=8, column=0, columnspan=3, sticky="e", padx=10, pady=20)
         def save_settings():
             # 다운로드 경로
             new_dp = download_path_var.get()
@@ -3952,6 +3974,11 @@ class RealEstateMonitorApp:
             if new_kb:
                 self.kb_excel_path = new_kb
 
+            # KB 월간 데이터 경로
+            new_kb_monthly = kb_monthly_var.get()
+            if new_kb_monthly:
+                self.kb_monthly_path = new_kb_monthly
+
             # 설정 저장
             settings_data = {
                 'download_path': self.download_path,
@@ -3962,6 +3989,7 @@ class RealEstateMonitorApp:
                 'active_list': self.active_list.get(),
                 'last_search_region': self.last_search_region,
                 'kb_excel_path': self.kb_excel_path,
+                'kb_monthly_path': self.kb_monthly_path,
                 'html_download_path': self.html_download_path,
                 'region_new_high_names': {k: list(v) for k, v in self._region_new_high_names.items()}
             }
@@ -3973,6 +4001,689 @@ class RealEstateMonitorApp:
             settings.destroy()
         ttk.Button(button_frame, text="취소", style='Accent.TButton', command=settings.destroy).pack(side='right', padx=5)
         ttk.Button(button_frame, text="저장", style='Accent.TButton', command=save_settings).pack(side='right')
+
+    def show_kb_monthly_chart(self):
+        """KB 월간 데이터 지역별 ㎡당 아파트 평균매매가 - HTML 차트 생성"""
+        path = self.kb_monthly_path
+        if not path or not os.path.exists(path):
+            path = filedialog.askopenfilename(
+                title="KB 월간 데이터 파일 선택",
+                initialdir=os.path.expanduser("~/Downloads"),
+                filetypes=[("Excel files", "*.xlsx *.xls"), ("All files", "*.*")]
+            )
+            if not path:
+                return
+            self.kb_monthly_path = path
+
+        try:
+            import openpyxl
+        except ImportError:
+            messagebox.showerror("오류", "pip install openpyxl 을 실행해주세요.")
+            return
+
+        try:
+            wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+            ws = wb['47.㎡당아파트평균매매']
+            rows = list(ws.iter_rows(values_only=True))
+        except Exception as e:
+            messagebox.showerror("오류", f"파일 로드 실패:\n{e}")
+            return
+
+        # 헤더 (컬럼 인덱스 → 원본 지역명)
+        row2 = rows[1]
+        row3 = rows[2]
+        col_max = max(len(row2), len(row3))
+        headers = []
+        for i in range(col_max):
+            v2 = row2[i] if i < len(row2) else None
+            v3 = row3[i] if i < len(row3) else None
+            headers.append(str(v2) if v2 else (str(v3) if v3 else ''))
+
+        # 날짜 파싱: YYYY.M(float) → 새 연도, 정수 → 같은 연도의 월
+        data_rows = []
+        current_year = None
+        for row in rows[4:]:
+            val = row[0]
+            if val is None or not isinstance(val, (int, float)):
+                continue
+            if isinstance(val, float):
+                year = int(val)
+                month = round((val - year) * 10)
+                current_year = year
+            else:
+                if current_year is None or not (1 <= int(val) <= 12):
+                    continue
+                year, month = current_year, int(val)
+            data_rows.append((f"{year}년 {month:02d}월", list(row)))
+
+        if not data_rows:
+            messagebox.showerror("오류", "데이터를 읽을 수 없습니다.")
+            return
+
+        dates = [d[0] for d in data_rows]
+        date_map = {d[0]: d[1] for d in data_rows}
+
+        # ── 지역 트리 구조 (display_name, col_idx, [children]) ──
+        def R(name, idx, *children):
+            return (name, idx, list(children))
+
+        tree_def = [
+            R('전국', 1),
+            R('서울특별시', 2,
+                R('강북14개구', 3,
+                    R('강북구', 4), R('광진구', 5), R('노원구', 6), R('도봉구', 7),
+                    R('동대문구', 8), R('마포구', 9), R('서대문구', 10), R('성동구', 11),
+                    R('성북구', 12), R('용산구', 13), R('은평구', 14), R('종로구', 15),
+                    R('중구', 16), R('중랑구', 17),
+                ),
+                R('강남11개구', 18,
+                    R('강남구', 19), R('강동구', 20), R('강서구', 21), R('관악구', 22),
+                    R('구로구', 23), R('금천구', 24), R('동작구', 25), R('서초구', 26),
+                    R('송파구', 27), R('양천구', 28), R('영등포구', 29),
+                ),
+            ),
+            R('6개광역시', 30,
+                R('부산광역시', 31,
+                    R('중구(부산)', 32), R('서구(부산)', 33), R('동구(부산)', 34), R('영도구', 35),
+                    R('부산진구', 36), R('동래구', 37), R('남구(부산)', 38), R('북구(부산)', 39),
+                    R('해운대구', 40), R('사하구', 41), R('금정구', 42), R('연제구', 43),
+                    R('수영구', 44), R('사상구', 45), R('기장군', 46), R('강서구(부산)', 47),
+                ),
+                R('대구광역시', 48,
+                    R('중구(대구)', 49), R('동구(대구)', 50), R('서구(대구)', 51), R('남구(대구)', 52),
+                    R('북구(대구)', 53), R('수성구', 54), R('달서구', 55), R('달성군', 56),
+                ),
+                R('인천광역시', 57,
+                    R('중구(인천)', 58), R('동구(인천)', 59), R('미추홀구', 60), R('연수구', 61),
+                    R('남동구', 62), R('부평구', 63), R('계양구', 64), R('서구(인천)', 65),
+                ),
+                R('광주광역시', 66,
+                    R('동구(광주)', 67), R('서구(광주)', 68), R('남구(광주)', 69),
+                    R('북구(광주)', 70), R('광산구', 71),
+                ),
+                R('대전광역시', 72,
+                    R('동구(대전)', 73), R('중구(대전)', 74), R('서구(대전)', 75),
+                    R('유성구', 76), R('대덕구', 77),
+                ),
+                R('울산광역시', 78,
+                    R('중구(울산)', 79), R('남구(울산)', 80), R('동구(울산)', 81),
+                    R('북구(울산)', 82), R('울주군', 83),
+                ),
+            ),
+            R('5개광역시', 84),
+            R('수도권', 85),
+            R('세종특별자치시', 86),
+            R('경기도', 87,
+                R('수원시', 88, R('장안구', 89), R('권선구', 90), R('팔달구', 91), R('영통구', 92)),
+                R('성남시', 93, R('수정구', 94), R('중원구', 95), R('분당구', 96)),
+                R('고양시', 97, R('덕양구', 98), R('일산동구', 99), R('일산서구', 100)),
+                R('안양시', 101, R('만안구', 102), R('동안구', 103)),
+                R('부천시', 104, R('원미구', 105), R('소사구', 106), R('오정구', 107)),
+                R('의정부시', 108), R('광명시', 109), R('평택시', 110),
+                R('안산시', 111, R('단원구', 112), R('상록구', 113)),
+                R('과천시', 114), R('구리시', 115), R('남양주시', 116),
+                R('용인시', 117, R('처인구', 118), R('기흥구', 119), R('수지구', 120)),
+                R('시흥시', 121), R('군포시', 122), R('의왕시', 123), R('하남시', 124),
+                R('오산시', 125), R('파주시', 126), R('이천시', 127), R('안성시', 128),
+                R('김포시', 129), R('양주시', 130), R('동두천', 131), R('광주시(경기)', 132),
+                R('화성시', 133, R('만세구', 134), R('효행구', 135), R('병점구', 136), R('동탄구', 137)),
+            ),
+            R('강원특별자치도', 138),
+            R('충청북도', 139),
+            R('충청남도', 140),
+            R('전라북도', 141),
+            R('전라남도', 142),
+            R('경상북도', 143),
+            R('경상남도', 144),
+            R('제주특별자치도', 145),
+            R('기타지방', 146),
+        ]
+
+        # ── 다이얼로그 ──
+        win = tk.Toplevel(self.root)
+        win.title("KB 월간 ㎡당 아파트 평균매매가 차트 생성")
+        win.geometry("1020x680")
+        win.configure(bg=self.palette['bg'])
+
+        content = ttk.Frame(win)
+        content.pack(fill='both', expand=True, padx=10, pady=8)
+
+        # ── 좌측: 지역 트리 ──
+        left = ttk.LabelFrame(content, text="지역 선택  (클릭 = 선택/해제 | 그룹 클릭 = 하위 전체)")
+        left.pack(side='left', fill='both', expand=True, padx=(0, 6))
+
+        tree_frame = ttk.Frame(left)
+        tree_frame.pack(fill='both', expand=True)
+
+        tv = ttk.Treeview(tree_frame, selectmode='none', show='tree')
+        vsb = ttk.Scrollbar(tree_frame, orient='vertical', command=tv.yview)
+        tv.configure(yscrollcommand=vsb.set)
+        tv.pack(side='left', fill='both', expand=True)
+        vsb.pack(side='right', fill='y')
+        tv.tag_configure('checked', foreground='#4ECDC4')
+        tv.tag_configure('unchecked', foreground=self.palette['text_primary'])
+
+        iid_to_col = {}   # iid → col_idx
+        iid_to_name = {}  # iid → display_name
+        col_to_iid = {}   # col_idx → iid
+        checked_cols = set()
+
+        def insert_tree(parent_iid, nodes):
+            for name, col_idx, children in nodes:
+                iid = tv.insert(parent_iid, 'end', text=f'☐ {name}', tags=('unchecked',), open=False)
+                iid_to_col[iid] = col_idx
+                iid_to_name[iid] = name
+                col_to_iid[col_idx] = iid
+                if children:
+                    insert_tree(iid, children)
+
+        insert_tree('', tree_def)
+
+        def get_all_iids(iid):
+            result = [iid]
+            for child in tv.get_children(iid):
+                result.extend(get_all_iids(child))
+            return result
+
+        def update_visual(iid):
+            col = iid_to_col.get(iid)
+            name = iid_to_name.get(iid, '')
+            if col in checked_cols:
+                tv.item(iid, text=f'☑ {name}', tags=('checked',))
+            else:
+                tv.item(iid, text=f'☐ {name}', tags=('unchecked',))
+
+        def toggle_item(iid):
+            col = iid_to_col.get(iid)
+            if col is None:
+                return
+            all_iids = get_all_iids(iid)
+            all_cols = [iid_to_col[i] for i in all_iids if i in iid_to_col]
+            if col in checked_cols:
+                for c in all_cols:
+                    checked_cols.discard(c)
+            else:
+                for c in all_cols:
+                    checked_cols.add(c)
+            for i in all_iids:
+                update_visual(i)
+            update_sel_label()
+
+        tv.bind('<Button-1>', lambda e: toggle_item(tv.identify_row(e.y)) if tv.identify_row(e.y) else None)
+
+        sel_label = ttk.Label(left, text="선택: 없음", wraplength=290,
+                              foreground=self.palette['text_secondary'])
+        sel_label.pack(anchor='w', padx=4, pady=(4, 0))
+
+        def update_sel_label():
+            if not checked_cols:
+                sel_label.config(text="선택: 없음")
+                return
+            names = [iid_to_name.get(col_to_iid.get(c, ''), str(c)) for c in sorted(checked_cols)]
+            preview = ', '.join(names[:6]) + ('…' if len(names) > 6 else '')
+            sel_label.config(text=f"선택 {len(names)}개: {preview}")
+
+        def clear_all():
+            checked_cols.clear()
+            for iid in iid_to_col:
+                update_visual(iid)
+            update_sel_label()
+
+        btn_row = ttk.Frame(left)
+        btn_row.pack(fill='x', padx=4, pady=4)
+        ttk.Button(btn_row, text="전체 해제", style='Accent.TButton', command=clear_all).pack(side='right')
+
+        # ── 우측: 비교 설정 ──
+        right = ttk.LabelFrame(content, text="비교 설정")
+        right.pack(side='right', fill='y', padx=(6, 0))
+
+        mode_var = tk.StringVar(value='지역')
+        ttk.Label(right, text="비교 모드:").pack(anchor='w', padx=10, pady=(10, 4))
+
+        def switch_mode():
+            if mode_var.get() == '지역':
+                year_panel.pack_forget()
+                region_panel.pack(fill='x', padx=10, pady=6)
+            else:
+                region_panel.pack_forget()
+                year_panel.pack(fill='x', padx=10, pady=6)
+
+        ttk.Radiobutton(right, text="지역 비교  (날짜 1개, 지역 여러 개)",
+                        variable=mode_var, value='지역', command=switch_mode).pack(anchor='w', padx=20)
+        ttk.Radiobutton(right, text="연도 비교  (동일 지역, 날짜 여러 개)",
+                        variable=mode_var, value='연도', command=switch_mode).pack(anchor='w', padx=20)
+
+        # 지역 비교 패널
+        region_panel = ttk.LabelFrame(right, text="날짜 선택")
+        ttk.Label(region_panel, text="날짜:").pack(anchor='w', padx=6, pady=(6, 2))
+        date_var = tk.StringVar(value=dates[-1])
+        ttk.Combobox(region_panel, values=dates, textvariable=date_var,
+                     state='readonly', width=18).pack(padx=6, pady=(0, 8))
+
+        # 연도 비교 패널
+        year_panel = ttk.LabelFrame(right, text="날짜 여러 개 선택")
+        selected_dates = list(dates[-3:])
+
+        add_row = ttk.Frame(year_panel)
+        add_row.pack(fill='x', padx=6, pady=(6, 2))
+        ttk.Label(add_row, text="추가:").pack(side='left')
+        add_date_var = tk.StringVar(value=dates[-1])
+        ttk.Combobox(add_row, values=dates, textvariable=add_date_var,
+                     state='readonly', width=14).pack(side='left', padx=(4, 4))
+
+        dates_lb = tk.Listbox(year_panel, height=7, width=22,
+                              bg=self.palette['surface'], fg=self.palette['text_primary'],
+                              selectmode='single', font=('맑은 고딕', 9))
+        dates_lb.pack(padx=6, pady=4, fill='x')
+        for d in selected_dates:
+            dates_lb.insert('end', d)
+
+        def add_date():
+            d = add_date_var.get()
+            if d and d not in selected_dates:
+                selected_dates.append(d)
+                dates_lb.insert('end', d)
+
+        def remove_date():
+            sel = dates_lb.curselection()
+            if sel:
+                idx = sel[0]
+                dates_lb.delete(idx)
+                selected_dates.pop(idx)
+
+        ttk.Button(add_row, text="추가", style='Accent.TButton', command=add_date).pack(side='left')
+        ttk.Button(year_panel, text="선택 삭제", style='Accent.TButton',
+                   command=remove_date).pack(anchor='e', padx=6, pady=(0, 6))
+
+        region_panel.pack(fill='x', padx=10, pady=6)
+
+        # 차트 제목
+        ttk.Label(right, text="차트 제목:").pack(anchor='w', padx=10, pady=(10, 2))
+        title_var = tk.StringVar(value="KB 월간 ㎡당 아파트 평균매매가")
+        ttk.Entry(right, textvariable=title_var, width=30).pack(padx=10, fill='x')
+
+        # ── HTML 생성 ──
+        def generate_html():
+            import json as _json, datetime as _dt
+
+            if not checked_cols:
+                messagebox.showwarning("알림", "지역을 1개 이상 선택해주세요.")
+                return
+
+            def collect_ordered(nodes):
+                result = []
+                for name, col_idx, children in nodes:
+                    if col_idx in checked_cols:
+                        result.append((col_idx, name))
+                    if children:
+                        result.extend(collect_ordered(children))
+                return result
+
+            ordered = collect_ordered(tree_def)
+            if not ordered:
+                return
+
+            region_cols  = [c for c, _ in ordered]
+            region_labels = [n for _, n in ordered]
+            chart_title  = title_var.get() or "KB 월간 평당 아파트 평균매매가"
+            now_str = _dt.datetime.now().strftime('%Y-%m-%d %H:%M')
+
+            # ── 팔레트 (신고가 페이지와 동일한 계열) ──
+            PALETTE = [
+                '#4caf50','#f44336','#2196f3','#ff9800','#9c27b0',
+                '#00bcd4','#e91e63','#8bc34a','#ff5722','#03a9f4',
+            ]
+            PALETTE_A = [c + 'cc' for c in PALETTE]   # 80% 불투명 (hex alpha)
+
+            # ── 데이터셋 구성 (㎡ → 평 환산: × 3.3) ──
+            datasets = []
+            if mode_var.get() == '지역':
+                sel_date = date_var.get()
+                row_data = date_map.get(sel_date, [])
+                values = [round(float(row_data[c]) * 3.3, 0) if c < len(row_data) and row_data[c] is not None else 0.0
+                          for c in region_cols]
+                max_v = max(values) if values else 1
+                # 상위 10%=빨강, 상위 10~25%=주황, 나머지=그린 계열
+                bg = []
+                bd = []
+                for v in values:
+                    if v >= max_v * 0.90:
+                        bg.append('rgba(244,67,54,0.82)');  bd.append('#f44336')
+                    elif v >= max_v * 0.75:
+                        bg.append('rgba(255,152,0,0.82)');  bd.append('#ff9800')
+                    else:
+                        bg.append('rgba(76,175,80,0.72)');  bd.append('#4caf50')
+                datasets.append({
+                    'label': sel_date,
+                    'data': values,
+                    'backgroundColor': bg,
+                    'borderColor': bd,
+                    'borderWidth': 2,
+                    'borderRadius': 8,
+                    'borderSkipped': False,
+                })
+                subtitle = sel_date
+                mode_label = '지역 비교'
+            else:
+                if not selected_dates:
+                    messagebox.showwarning("알림", "날짜를 1개 이상 추가해주세요.")
+                    return
+                for i, d in enumerate(selected_dates):
+                    row_data = date_map.get(d, [])
+                    values = [round(float(row_data[c]) * 3.3, 0) if c < len(row_data) and row_data[c] is not None else 0.0
+                              for c in region_cols]
+                    col = PALETTE[i % len(PALETTE)]
+                    col_a = col + 'b3'  # ~70%
+                    datasets.append({
+                        'label': d,
+                        'data': values,
+                        'backgroundColor': col_a,
+                        'borderColor': col,
+                        'borderWidth': 2,
+                        'borderRadius': 6,
+                        'borderSkipped': False,
+                    })
+                subtitle = ' vs '.join(selected_dates)
+                mode_label = '연도별 비교'
+
+            # ── 내림차순 정렬 (지역 비교: 첫 dataset 기준 / 연도 비교: 첫 날짜 기준) ──
+            if datasets:
+                sort_values = datasets[0]['data']
+                sort_order = sorted(range(len(region_labels)), key=lambda i: -sort_values[i])
+                region_labels = [region_labels[i] for i in sort_order]
+                for ds in datasets:
+                    ds['data'] = [ds['data'][i] for i in sort_order]
+                    if isinstance(ds.get('backgroundColor'), list):
+                        ds['backgroundColor'] = [ds['backgroundColor'][i] for i in sort_order]
+                    if isinstance(ds.get('borderColor'), list):
+                        ds['borderColor'] = [ds['borderColor'][i] for i in sort_order]
+
+            labels_json   = _json.dumps(region_labels, ensure_ascii=False)
+            datasets_json = _json.dumps(datasets,      ensure_ascii=False)
+            multi = len(datasets) > 1
+
+            # ── 요약 카드 데이터 (지역 비교 모드만) ──
+            summary_html = ''
+            if mode_var.get() == '지역' and datasets:
+                pairs = list(zip(region_labels, datasets[0]['data']))  # 이미 정렬됨
+                top3 = pairs[:3]
+                cards = ''
+                medals = ['🥇','🥈','🥉']
+                for rank, (nm, vl) in enumerate(top3):
+                    cards += f'''<div class="sum-card">
+                      <span class="sum-medal">{medals[rank]}</span>
+                      <span class="sum-name">{nm}</span>
+                      <span class="sum-val">{vl:,.0f}</span>
+                      <span class="sum-unit">만원/평</span>
+                    </div>'''
+                avg_v = sum(datasets[0]['data']) / max(len(datasets[0]['data']), 1)
+                summary_html = f'''<div class="summary-row">
+                  {cards}
+                  <div class="sum-card sum-avg">
+                    <span class="sum-medal">📊</span>
+                    <span class="sum-name">평균</span>
+                    <span class="sum-val">{avg_v:,.0f}</span>
+                    <span class="sum-unit">만원/평</span>
+                  </div>
+                </div>'''
+
+            chart_h_px = 480
+
+            html_content = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>{chart_title}</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+:root{{
+  --bg:#0b0c10; --card:#151822; --text:#e8eaf0; --muted:#96a0b5;
+  --accent:#4caf50; --border:rgba(255,255,255,.08);
+  --red:#f44336; --orange:#ff9800; --blue:#2196f3;
+}}
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{
+  font-family:ui-sans-serif,system-ui,-apple-system,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",Arial,sans-serif;
+  background:linear-gradient(180deg,#0b0c10 0%,#0f1220 100%);
+  color:var(--text);min-height:100vh;-webkit-font-smoothing:antialiased;
+}}
+header{{
+  position:sticky;top:0;z-index:10;
+  backdrop-filter:saturate(150%) blur(8px);
+  background:rgba(11,12,16,.65);
+  border-bottom:1px solid var(--border);
+  padding:14px 20px;
+}}
+.header-inner{{max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}}
+.header-left h1{{font-size:clamp(18px,3vw,24px);font-weight:800;}}
+.header-left .sub{{font-size:12px;color:var(--muted);margin-top:3px;}}
+.badge{{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;
+  background:linear-gradient(135deg,var(--accent),#38a169);color:#fff;
+}}
+.wrap{{max-width:1100px;margin:0 auto;padding:24px 16px 48px;}}
+
+/* 요약 카드 */
+.summary-row{{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:28px;}}
+.sum-card{{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:16px 20px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;
+  min-width:160px;flex:1;
+  transition:transform .2s,box-shadow .2s;
+}}
+.sum-card:hover{{transform:translateY(-3px);box-shadow:0 8px 24px rgba(76,175,80,.15);border-color:rgba(76,175,80,.4);}}
+.sum-avg{{border-color:rgba(33,150,243,.3);}}
+.sum-medal{{font-size:22px;}}
+.sum-name{{font-size:13px;color:var(--muted);font-weight:600;}}
+.sum-val{{font-size:22px;font-weight:800;color:var(--text);}}
+.sum-unit{{font-size:11px;color:var(--muted);}}
+
+/* 차트 카드 */
+.chart-card{{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:24px;margin-bottom:28px;
+}}
+.chart-card-header{{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:20px;}}
+.chart-card-title{{font-size:18px;font-weight:800;}}
+.chart-card-sub{{font-size:12px;color:var(--muted);margin-top:4px;}}
+.mode-badge{{
+  padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;
+  background:rgba(76,175,80,.18);color:var(--accent);border:1px solid rgba(76,175,80,.3);
+}}
+.chart-wrap{{position:relative;width:100%;height:{chart_h_px}px;}}
+
+/* 범례 (다중 데이터셋) */
+.legend-row{{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px;}}
+.legend-item{{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}}
+.legend-dot{{width:12px;height:12px;border-radius:3px;flex-shrink:0;}}
+
+/* 테이블 */
+.table-card{{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;overflow-x:auto;}}
+.table-card-title{{font-size:16px;font-weight:800;margin-bottom:16px;}}
+.data-table{{width:100%;border-collapse:collapse;font-size:13px;}}
+.data-table th{{
+  background:#1a1d28;color:var(--muted);font-weight:600;
+  padding:10px 14px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap;
+}}
+.data-table th:first-child{{text-align:left;}}
+.data-table td{{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04);text-align:right;}}
+.data-table td:first-child{{text-align:left;font-weight:600;}}
+.data-table tr:hover td{{background:rgba(255,255,255,.03);}}
+.val-top{{color:#f44336;font-weight:700;}}
+.val-mid{{color:#ff9800;font-weight:600;}}
+
+footer{{
+  text-align:center;padding:20px;color:var(--muted);font-size:12px;
+  border-top:1px solid var(--border);margin-top:16px;
+}}
+@media(max-width:600px){{
+  .summary-row{{flex-direction:column;}}
+  .sum-card{{min-width:0;}}
+}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <h1>📊 {chart_title}</h1>
+      <div class="sub">KB 월간 데이터 · ㎡당 아파트 평균매매가 · {now_str} 생성</div>
+    </div>
+    <div class="badge">📈 {mode_label}</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  {summary_html}
+
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-card-title">지역별 평당 아파트 평균매매가</div>
+        <div class="chart-card-sub">{subtitle} · 단위: 만원/평 (㎡ × 3.3 환산)</div>
+      </div>
+      <div class="mode-badge">{mode_label}</div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="mainChart"></canvas>
+    </div>
+    {'<div class="legend-row" id="legendRow"></div>' if multi else ''}
+  </div>
+
+  <div class="table-card">
+    <div class="table-card-title">📋 상세 수치</div>
+    <table class="data-table" id="dataTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>부태리의 실거래가 모니터 · KB 월간 데이터 차트 · {now_str}</footer>
+
+<script>
+Chart.register(ChartDataLabels);
+
+const labels   = {labels_json};
+const datasets = {datasets_json};
+const isMulti  = {'true' if multi else 'false'};
+
+const ctx = document.getElementById('mainChart').getContext('2d');
+const chart = new Chart(ctx, {{
+  type: 'bar',
+  data: {{ labels, datasets }},
+  options: {{
+    indexAxis: 'x',
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: {{ duration: 600, easing: 'easeOutQuart' }},
+    plugins: {{
+      legend: {{ display: false }},
+      tooltip: {{
+        backgroundColor: 'rgba(21,24,34,0.95)',
+        borderColor: 'rgba(255,255,255,0.12)',
+        borderWidth: 1,
+        titleColor: '#e8eaf0',
+        bodyColor: '#96a0b5',
+        padding: 12,
+        callbacks: {{
+          label: ctx => ` ${{ctx.dataset.label}}: ${{ctx.parsed.y.toLocaleString()}} 만원/평`
+        }}
+      }},
+      datalabels: {{
+        display: !isMulti,
+        color: 'rgba(232,234,240,0.8)',
+        anchor: 'end',
+        align: 'top',
+        offset: 4,
+        font: {{ size: 10, weight: '600' }},
+        formatter: v => v >= 1000 ? (v/1000).toFixed(1)+'k' : v.toLocaleString(),
+      }}
+    }},
+    scales: {{
+      x: {{
+        title: {{ display: true, text: '지역', color: 'rgba(150,160,181,0.7)', font: {{ size: 11 }} }},
+        grid: {{ color: 'rgba(255,255,255,0.06)' }},
+        ticks: {{
+          color: 'rgba(150,160,181,0.9)',
+          maxRotation: 45,
+          font: {{ size: 10 }},
+        }},
+        border: {{ color: 'rgba(255,255,255,0.08)' }}
+      }},
+      y: {{
+        title: {{ display: true, text: '만원/평', color: 'rgba(150,160,181,0.7)', font: {{ size: 11 }} }},
+        grid: {{ color: 'rgba(255,255,255,0.06)' }},
+        ticks: {{
+          color: 'rgba(150,160,181,0.9)',
+          callback: v => v.toLocaleString()
+        }},
+        border: {{ color: 'rgba(255,255,255,0.08)' }}
+      }}
+    }},
+    barPercentage: isMulti ? 0.75 : 0.65,
+    categoryPercentage: isMulti ? 0.85 : 0.7,
+  }}
+}});
+
+// 커스텀 범례
+if (isMulti) {{
+  const row = document.getElementById('legendRow');
+  if (row) {{
+    datasets.forEach(ds => {{
+      const item = document.createElement('div');
+      item.className = 'legend-item';
+      item.innerHTML = `<div class="legend-dot" style="background:${{ds.borderColor}}"></div>${{ds.label}}`;
+      row.appendChild(item);
+    }});
+  }}
+}}
+
+// 테이블 렌더링
+(function() {{
+  const thead = document.getElementById('tableHead');
+  const tbody = document.getElementById('tableBody');
+  let thHtml = '<tr><th>지역</th>';
+  datasets.forEach(ds => thHtml += `<th>${{ds.label}}</th>`);
+  thHtml += '</tr>';
+  thead.innerHTML = thHtml;
+
+  const allVals = datasets.flatMap(ds => ds.data);
+  const maxV = Math.max(...allVals);
+
+  labels.forEach((lbl, i) => {{
+    let tr = `<tr><td>${{lbl}}</td>`;
+    datasets.forEach(ds => {{
+      const v = ds.data[i];
+      let cls = v >= maxV * 0.9 ? 'val-top' : (v >= maxV * 0.75 ? 'val-mid' : '');
+      tr += `<td class="${{cls}}">${{v.toLocaleString()}}</td>`;
+    }});
+    tr += '</tr>';
+    tbody.innerHTML += tr;
+  }});
+}})();
+</script>
+</body>
+</html>"""
+
+            base_dir = getattr(self, 'html_download_path', '') or os.path.expanduser('~/Downloads')
+            save_dir = os.path.join(base_dir, 'newtrade')
+            os.makedirs(save_dir, exist_ok=True)
+            ts = _dt.datetime.now().strftime('%Y%m%d_%H%M%S')
+            save_path = os.path.join(save_dir, f'kb_monthly_chart_{ts}.html')
+            with open(save_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            webbrowser.open('file://' + save_path)
+            logging.info(f"KB 월간 차트 HTML 저장: {save_path}")
+
+        ttk.Button(right, text="📊  HTML 생성 및 열기", style='Accent.TButton',
+                   command=generate_html).pack(pady=16, padx=10, fill='x')
 
     def setup_scheduler(self):
         """스케줄러 설정"""
@@ -11357,6 +12068,13 @@ class RealEstateMonitorApp:
       <h2 class="block-title">단지 매전차트 분석</h2>
       <p class="block-desc">단지별 매매·전세 가격 추이를 차트로 분석하세요</p>
     </div>
+
+    <!-- KB부동산 데이터 블럭카드 -->
+    <div class="block-card" onclick="location.href='KB부동산데이터.html'">
+      <span class="block-icon">🏦</span>
+      <h2 class="block-title">KB부동산 데이터</h2>
+      <p class="block-desc">KB 매매증감 지역별 주간·3개월·6개월·1년 상승률을 확인하세요</p>
+    </div>
   </div>
 
   <!-- 부동산 최신 근황 섹션 (직접 표시) -->
@@ -11863,6 +12581,1668 @@ function closeChartModal() {
 </body>''', 1)
         return html_content
 
+    def build_kb_html(self, kb_analysis):
+        """KB부동산 데이터 전용 HTML 생성 (KB부동산데이터.html)"""
+        from html import escape
+        import json as _json
+        from collections import defaultdict
+        from datetime import timedelta
+
+        if not kb_analysis:
+            return None
+
+        medals = ['🥇', '🥈', '🥉']
+        kb_date = kb_analysis.get('latest_date', '')
+        kb_annual_data = kb_analysis.get('kb_annual_data', {})
+        kb_annual_data_json = _json.dumps(kb_annual_data, ensure_ascii=False)
+
+        now = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        def render_top3_cards(periods):
+            html = ''
+            for label, key in periods:
+                items = kb_analysis.get(key, [])
+                rows = ''
+                for i, (region, val) in enumerate(items):
+                    rows += f'''<div class="kb-row">
+                      <span class="kb-rank">{medals[i]}</span>
+                      <span class="kb-region region-link" onclick="showRegionChart('{escape(region)}')">{escape(region)}</span>
+                      <span class="kb-val {'pos' if val >= 0 else 'neg'}">{val:+.2f}%</span>
+                    </div>'''
+                html += f'''<div class="top3-card">
+                  <div class="top3-label">{label}</div>
+                  {rows}
+                </div>'''
+            return html
+
+        top3_html = render_top3_cards([
+            ('🏆 최근 주간 상승 TOP3', 'weekly_top3'),
+            ('📅 3개월 누적 TOP3', 'month3_top3'),
+            ('📅 6개월 누적 TOP3', 'month6_top3'),
+            ('📅 1년 누적 TOP3', 'year1_top3'),
+        ])
+
+        # ── 거래 데이터에서 지역별 평단가 / 분위가격 계산 (최근 6개월) ──
+        six_months_ago = datetime.now() - timedelta(days=182)
+        sigungu_py_prices = defaultdict(list)   # sigungu → [평단가, ...]
+        sigungu_prices    = defaultdict(list)   # sigungu → [거래가(만원), ...]
+
+        monitored_apts = getattr(self, 'monitored_apts', []) or []
+        for apt in monitored_apts:
+            sigungu = apt.get('sigungu', '') or ''
+            if not sigungu:
+                continue
+            for trade in apt.get('trade_data', []):
+                try:
+                    trade_date = trade.get('date', '')
+                    if trade_date:
+                        ds = str(trade_date).replace('.', '-').replace('/', '-').split()[0]
+                        if datetime.strptime(ds, '%Y-%m-%d') < six_months_ago:
+                            continue
+                    price = trade.get('price', 0)
+                    if not price:
+                        continue
+                    price = float(price)
+                    sigungu_prices[sigungu].append(price)
+                    # 평단가 계산
+                    area_raw = trade.get('area', '')
+                    if isinstance(area_raw, dict):
+                        continue
+                    area_str = str(area_raw).replace('㎡', '').strip()
+                    area_m2 = float(area_str) if area_str else 0.0
+                    if area_m2 > 0:
+                        py_price = price / area_m2 * 3.3058
+                        sigungu_py_prices[sigungu].append(round(py_price, 1))
+                except Exception:
+                    continue
+
+        def percentile(lst, p):
+            if not lst:
+                return 0
+            s = sorted(lst)
+            k = (len(s) - 1) * p / 100
+            f, c = int(k), min(int(k) + 1, len(s) - 1)
+            return round(s[f] + (s[c] - s[f]) * (k - f), 0)
+
+        # 평단가 통계 (sigungu 기준, 거래 5건 이상만)
+        py_stats = []
+        for sg, vals in sigungu_py_prices.items():
+            if len(vals) < 3:
+                continue
+            py_stats.append({
+                'sigungu': sg,
+                'avg': round(sum(vals) / len(vals), 0),
+                'count': len(vals),
+            })
+        py_stats.sort(key=lambda x: x['avg'], reverse=True)
+
+        # 분위가격 통계
+        qtl_stats = []
+        for sg, vals in sigungu_prices.items():
+            if len(vals) < 3:
+                continue
+            qtl_stats.append({
+                'sigungu': sg,
+                'q1':  percentile(vals, 25),
+                'med': percentile(vals, 50),
+                'q3':  percentile(vals, 75),
+                'max': round(max(vals), 0),
+                'count': len(vals),
+            })
+        qtl_stats.sort(key=lambda x: x['med'], reverse=True)
+
+        py_stats_json  = _json.dumps(py_stats,  ensure_ascii=False)
+        qtl_stats_json = _json.dumps(qtl_stats, ensure_ascii=False)
+
+        # ── KB 월간 Excel → 탭1 지역 선택 차트용 데이터 ──
+        kb_monthly_regions = {}   # {region_name: {latest_date: val, dates: [...], values: [...]}}
+        kb_monthly_dates   = []
+        try:
+            monthly_path = getattr(self, 'kb_monthly_path', '')
+            if monthly_path and os.path.exists(monthly_path):
+                import openpyxl as _oxl
+                _wb = _oxl.load_workbook(monthly_path, read_only=True, data_only=True)
+                _ws = _wb['47.㎡당아파트평균매매']
+                _rows = list(_ws.iter_rows(values_only=True))
+                _row2, _row3 = _rows[1], _rows[2]
+                _col_max = max(len(_row2), len(_row3))
+                _headers = []
+                for _i in range(_col_max):
+                    _v2 = _row2[_i] if _i < len(_row2) else None
+                    _v3 = _row3[_i] if _i < len(_row3) else None
+                    _headers.append(str(_v2) if _v2 else (str(_v3) if _v3 else ''))
+
+                # 날짜 파싱
+                _data_rows = []
+                _cur_year = None
+                for _row in _rows[4:]:
+                    _val = _row[0]
+                    if _val is None or not isinstance(_val, (int, float)):
+                        continue
+                    if isinstance(_val, float):
+                        _y = int(_val); _m = round((_val - _y) * 10); _cur_year = _y
+                    else:
+                        if _cur_year is None or not (1 <= int(_val) <= 12):
+                            continue
+                        _y, _m = _cur_year, int(_val)
+                    _data_rows.append((f"{_y}년 {_m:02d}월", list(_row)))
+
+                kb_monthly_dates = [d[0] for d in _data_rows]
+                # 컬럼 인덱스 → 표시명 매핑 (동명 지역 구분: 중구/강서구 등)
+                _col_name_map = {
+                    1:'전국', 2:'서울특별시', 3:'강북14개구', 4:'강북구', 5:'광진구',
+                    6:'노원구', 7:'도봉구', 8:'동대문구', 9:'마포구', 10:'서대문구',
+                    11:'성동구', 12:'성북구', 13:'용산구', 14:'은평구', 15:'종로구',
+                    16:'중구', 17:'중랑구', 18:'강남11개구', 19:'강남구', 20:'강동구',
+                    21:'강서구', 22:'관악구', 23:'구로구', 24:'금천구', 25:'동작구',
+                    26:'서초구', 27:'송파구', 28:'양천구', 29:'영등포구',
+                    30:'6개광역시', 31:'부산광역시', 32:'중구(부산)', 33:'서구(부산)',
+                    34:'동구(부산)', 35:'영도구', 36:'부산진구', 37:'동래구',
+                    38:'남구(부산)', 39:'북구(부산)', 40:'해운대구', 41:'사하구',
+                    42:'금정구', 43:'연제구', 44:'수영구', 45:'사상구', 46:'기장군',
+                    47:'강서구(부산)', 48:'대구광역시', 49:'중구(대구)', 50:'동구(대구)',
+                    51:'서구(대구)', 52:'남구(대구)', 53:'북구(대구)', 54:'수성구',
+                    55:'달서구', 56:'달성군', 57:'인천광역시', 58:'중구(인천)',
+                    59:'동구(인천)', 60:'미추홀구', 61:'연수구', 62:'남동구',
+                    63:'부평구', 64:'계양구', 65:'서구(인천)', 66:'광주광역시',
+                    67:'동구(광주)', 68:'서구(광주)', 69:'남구(광주)', 70:'북구(광주)',
+                    71:'광산구', 72:'대전광역시', 73:'동구(대전)', 74:'중구(대전)',
+                    75:'서구(대전)', 76:'유성구', 77:'대덕구', 78:'울산광역시',
+                    79:'중구(울산)', 80:'남구(울산)', 81:'동구(울산)', 82:'북구(울산)',
+                    83:'울주군', 84:'5개광역시', 85:'수도권', 86:'세종특별자치시',
+                    87:'경기도', 88:'수원시', 89:'장안구', 90:'권선구', 91:'팔달구',
+                    92:'영통구', 93:'성남시', 94:'수정구', 95:'중원구', 96:'분당구',
+                    97:'고양시', 98:'덕양구', 99:'일산동구', 100:'일산서구',
+                    101:'안양시', 102:'만안구', 103:'동안구', 104:'부천시',
+                    105:'원미구', 106:'소사구', 107:'오정구', 108:'의정부시',
+                    109:'광명시', 110:'평택시', 111:'안산시', 112:'단원구',
+                    113:'상록구', 114:'과천시', 115:'구리시', 116:'남양주시',
+                    117:'용인시', 118:'처인구', 119:'기흥구', 120:'수지구',
+                    121:'시흥시', 122:'군포시', 123:'의왕시', 124:'하남시',
+                    125:'오산시', 126:'파주시', 127:'이천시', 128:'안성시',
+                    129:'김포시', 130:'양주시', 131:'동두천', 132:'광주시(경기)',
+                    133:'화성시', 134:'만세구', 135:'효행구', 136:'병점구',
+                    137:'동탄구', 138:'강원특별자치도', 139:'충청북도', 140:'충청남도',
+                    141:'전라북도', 142:'전라남도', 143:'경상북도', 144:'경상남도',
+                    145:'제주특별자치도', 146:'기타지방',
+                }
+                # 컬럼 1~끝까지 지역 데이터 수집
+                for _ci in range(1, len(_headers)):
+                    _rname = _col_name_map.get(_ci, _headers[_ci])
+                    if not _rname:
+                        continue
+                    _vals = []
+                    for _dlabel, _drow in _data_rows:
+                        _v = _drow[_ci] if _ci < len(_drow) else None
+                        _vals.append(round(float(_v) * 3.3, 0) if _v is not None and isinstance(_v, (int, float)) else None)
+                    kb_monthly_regions[_rname] = _vals
+        except Exception as _e:
+            logging.warning(f"KB 월간 Excel 로드 실패 (탭1): {_e}")
+
+        kb_monthly_regions_json = _json.dumps(kb_monthly_regions, ensure_ascii=False)
+        kb_monthly_dates_json   = _json.dumps(kb_monthly_dates,   ensure_ascii=False)
+
+        # ── 지역 그룹 (시/도별 묶음) — KB_MONTHLY_REGIONS 에 존재하는 것만 포함 ──
+        _rg_def = [
+            {"group": "전국/기타",   "regions": ["전국","6개광역시","5개광역시","수도권","세종특별자치시","강원특별자치도","충청북도","충청남도","전라북도","전라남도","경상북도","경상남도","제주특별자치도","기타지방"]},
+            {"group": "서울특별시",  "regions": ["서울특별시","강북14개구","강북구","광진구","노원구","도봉구","동대문구","마포구","서대문구","성동구","성북구","용산구","은평구","종로구","중구","중랑구","강남11개구","강남구","강동구","강서구","관악구","구로구","금천구","동작구","서초구","송파구","양천구","영등포구"]},
+            {"group": "경기도",      "regions": ["경기도","수원시","장안구","권선구","팔달구","영통구","성남시","수정구","중원구","분당구","고양시","덕양구","일산동구","일산서구","안양시","만안구","동안구","부천시","원미구","소사구","오정구","의정부시","광명시","평택시","안산시","단원구","상록구","과천시","구리시","남양주시","용인시","처인구","기흥구","수지구","시흥시","군포시","의왕시","하남시","오산시","파주시","이천시","안성시","김포시","양주시","동두천","광주시(경기)","화성시","만세구","효행구","병점구","동탄구"]},
+            {"group": "부산광역시",  "regions": ["부산광역시","중구(부산)","서구(부산)","동구(부산)","영도구","부산진구","동래구","남구(부산)","북구(부산)","해운대구","사하구","금정구","연제구","수영구","사상구","기장군","강서구(부산)"]},
+            {"group": "대구광역시",  "regions": ["대구광역시","중구(대구)","동구(대구)","서구(대구)","남구(대구)","북구(대구)","수성구","달서구","달성군"]},
+            {"group": "인천광역시",  "regions": ["인천광역시","중구(인천)","동구(인천)","미추홀구","연수구","남동구","부평구","계양구","서구(인천)"]},
+            {"group": "광주광역시",  "regions": ["광주광역시","동구(광주)","서구(광주)","남구(광주)","북구(광주)","광산구"]},
+            {"group": "대전광역시",  "regions": ["대전광역시","동구(대전)","중구(대전)","서구(대전)","유성구","대덕구"]},
+            {"group": "울산광역시",  "regions": ["울산광역시","중구(울산)","남구(울산)","동구(울산)","북구(울산)","울주군"]},
+        ]
+        kb_region_groups = [
+            {"group": g["group"], "regions": [r for r in g["regions"] if r in kb_monthly_regions]}
+            for g in _rg_def
+            if any(r in kb_monthly_regions for r in g["regions"])
+        ]
+        kb_region_groups_json = _json.dumps(kb_region_groups, ensure_ascii=False)
+
+        # ── newtrade 폴더 내 가장 최근 kb_monthly_chart_*.html 파일명 ──
+        kb_monthly_chart_filename = ''
+        try:
+            _nt_dir = os.path.join(getattr(self, 'html_download_path', ''), 'newtrade')
+            if os.path.isdir(_nt_dir):
+                import glob as _glob
+                _files = sorted(
+                    _glob.glob(os.path.join(_nt_dir, 'kb_monthly_chart_*.html')),
+                    key=os.path.getmtime, reverse=True
+                )
+                if _files:
+                    kb_monthly_chart_filename = os.path.basename(_files[0])
+        except Exception as _e:
+            logging.warning(f"KB 월간 차트 파일 탐색 실패: {_e}")
+
+        html_content = f"""<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KB부동산 데이터 — 부태리</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-75SPDY6N8V"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){{dataLayer.push(arguments);}}
+  gtag('js', new Date());
+  gtag('config', 'G-75SPDY6N8V');
+</script>
+<style>
+:root{{
+  --bg:#0b0c10; --card:#151822; --text:#e8eaf0; --muted:#96a0b5;
+  --accent:#4caf50; --border:rgba(255,255,255,.08);
+}}
+*{{box-sizing:border-box;margin:0;padding:0;}}
+body{{
+  font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",Arial,sans-serif;
+  background:linear-gradient(180deg,#0b0c10 0%,#0f1220 100%);
+  color:var(--text); -webkit-font-smoothing:antialiased;
+}}
+header.main-header{{
+  position:sticky;top:0;z-index:10;
+  backdrop-filter:saturate(150%) blur(8px);
+  background:rgba(11,12,16,.6);
+  border-bottom:1px solid var(--border);
+}}
+.wrap{{max-width:1080px;margin:0 auto;padding:18px 16px;}}
+.back-link{{font-size:13px;color:var(--muted);text-decoration:none;}}
+.back-link:hover{{color:var(--text);}}
+.main-title{{font-size:clamp(22px,3.5vw,30px);font-weight:800;margin-top:8px;}}
+.sub{{color:var(--muted);font-size:13px;margin-top:4px;}}
+.created-date{{text-align:right;font-size:12px;color:var(--muted);margin-top:4px;}}
+
+/* ── 상단 탭 카드 ── */
+.tab-cards{{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  margin-top:28px;
+}}
+.tab-card{{
+  background:var(--card);
+  border:2px solid var(--border);
+  border-radius:16px;
+  padding:22px 18px;
+  cursor:pointer;
+  text-align:center;
+  transition:all .25s ease;
+  position:relative;
+}}
+.tab-card:hover{{
+  border-color:rgba(76,175,80,.5);
+  transform:translateY(-3px);
+  box-shadow:0 8px 24px rgba(76,175,80,.15);
+}}
+.tab-card.active{{
+  border-color:var(--accent);
+  background:linear-gradient(135deg,rgba(76,175,80,.18),rgba(76,175,80,.06));
+  box-shadow:0 6px 20px rgba(76,175,80,.2);
+}}
+.tab-card-icon{{font-size:32px;margin-bottom:10px;display:block;}}
+.tab-card-title{{font-size:15px;font-weight:800;margin-bottom:4px;}}
+.tab-card-desc{{font-size:12px;color:var(--muted);line-height:1.5;}}
+
+/* ── 탭 패널 ── */
+.tab-panel{{display:none;}}
+.tab-panel.active{{display:block;}}
+
+/* TOP3 그리드 */
+.top3-grid{{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(230px,1fr));
+  gap:16px;
+  margin-top:28px;
+}}
+.top3-card{{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:20px;
+}}
+.top3-label{{font-size:13px;font-weight:700;color:var(--muted);margin-bottom:14px;letter-spacing:.3px;}}
+.kb-row{{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);}}
+.kb-row:last-child{{border-bottom:none;}}
+.kb-rank{{font-size:16px;width:24px;flex-shrink:0;}}
+.kb-region{{flex:1;font-size:14px;font-weight:600;cursor:pointer;}}
+.kb-region:hover{{color:var(--accent);text-decoration:underline;}}
+.kb-val{{font-size:14px;font-weight:700;flex-shrink:0;}}
+.kb-val.pos{{color:#f44336;}}
+.kb-val.neg{{color:#3498db;}}
+
+/* 전체 지역 테이블 */
+.table-section{{margin-top:32px;}}
+.table-header{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;}}
+.table-title{{font-size:18px;font-weight:800;}}
+.search-box{{
+  padding:8px 14px;border-radius:8px;
+  background:var(--card);border:1px solid var(--border);
+  color:var(--text);font-size:14px;width:220px;outline:none;
+}}
+.search-box:focus{{border-color:var(--accent);}}
+.data-table{{width:100%;border-collapse:collapse;font-size:13px;}}
+.data-table th{{
+  background:#1a1d28;color:var(--muted);font-weight:600;
+  padding:10px 12px;text-align:right;border-bottom:1px solid var(--border);
+  white-space:nowrap;cursor:pointer;user-select:none;
+}}
+.data-table th:first-child{{text-align:left;}}
+.data-table th:hover{{color:var(--text);}}
+.data-table td{{padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.04);text-align:right;}}
+.data-table td:first-child{{text-align:left;}}
+.data-table tr:hover td{{background:rgba(255,255,255,.03);}}
+.pos{{color:#f44336;font-weight:600;}}
+.neg{{color:#3498db;font-weight:600;}}
+.region-link{{cursor:pointer;}}
+.region-link:hover{{color:var(--accent);text-decoration:underline;}}
+
+/* 차트 섹션 (탭2·3) */
+.chart-section{{margin-top:28px;}}
+.chart-wrap{{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:16px;padding:24px;
+  margin-bottom:24px;
+}}
+.chart-wrap-title{{font-size:16px;font-weight:800;margin-bottom:18px;}}
+.no-data{{
+  text-align:center;padding:48px;color:var(--muted);font-size:15px;
+}}
+
+/* ── 탭1 지역 선택 컨트롤 ── */
+.py-ctrl-row{{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;}}
+.py-ctrl-left{{display:flex;gap:8px;flex-wrap:wrap;}}
+.py-preset-btn{{
+  padding:6px 14px;border-radius:20px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;
+  transition:all .18s;
+}}
+.py-preset-btn:hover,.py-preset-btn.active{{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+}}
+.py-search-input{{
+  padding:7px 14px;border-radius:10px;border:1px solid var(--border);
+  background:var(--card);color:var(--text);font-size:13px;outline:none;width:200px;
+}}
+.py-search-input:focus{{border-color:var(--accent);}}
+.py-chip-area{{
+  display:flex;flex-wrap:wrap;gap:7px;
+  max-height:140px;overflow-y:auto;padding:4px 0;
+}}
+.py-chip{{
+  padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);
+  white-space:nowrap;
+  transition:all .15s;user-select:none;
+}}
+.py-chip:hover{{border-color:rgba(76,175,80,.5);color:var(--text);}}
+.py-chip.selected{{
+  background:linear-gradient(135deg,rgba(76,175,80,.25),rgba(76,175,80,.1));
+  border-color:var(--accent);color:var(--accent);
+}}
+.py-chip.hidden{{display:none;}}
+
+/* 지역 그룹 아코디언 */
+.py-group-list{{display:flex;flex-direction:column;gap:6px;padding:2px 0;}}
+.py-group{{border:1px solid var(--border);border-radius:10px;overflow:hidden;}}
+.py-group-header{{
+  display:flex;align-items:center;gap:8px;padding:8px 12px;
+  background:rgba(255,255,255,.04);cursor:pointer;
+  font-size:13px;font-weight:700;color:var(--text);
+  user-select:none;transition:background .15s;
+}}
+.py-group-header:hover{{background:rgba(255,255,255,.08);}}
+.py-group-arrow{{font-size:10px;color:var(--muted);transition:transform .18s;flex-shrink:0;}}
+.py-group-arrow.open{{transform:rotate(90deg);}}
+.py-group-name{{flex:1;}}
+.py-group-count{{font-size:11px;color:var(--muted);font-weight:400;}}
+.py-group-sel-btn{{
+  padding:3px 10px;border-radius:12px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-size:11px;cursor:pointer;
+  transition:all .15s;flex-shrink:0;
+}}
+.py-group-sel-btn:hover{{background:var(--accent);border-color:var(--accent);color:#fff;}}
+.py-group-chips{{
+  display:none;flex-wrap:wrap;gap:6px;padding:10px 12px;
+  border-top:1px solid var(--border);background:rgba(0,0,0,.15);
+}}
+.py-group-chips.open{{display:flex;}}
+.py-group.group-hidden{{display:none;}}
+
+/* 차트 모달 (KB 연간 차트) */
+.chart-modal-overlay{{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,0,0,.7);z-index:1000;
+  align-items:center;justify-content:center;
+}}
+.chart-modal-overlay.show{{display:flex;}}
+.chart-modal{{
+  background:#1a1d28;border-radius:16px;
+  padding:24px;width:min(90vw,700px);
+  border:1px solid var(--border);
+}}
+.chart-modal-header{{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}}
+.chart-modal-title{{font-size:17px;font-weight:800;}}
+.chart-modal-close{{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;}}
+.chart-modal-close:hover{{color:var(--text);}}
+.chart-tabs{{display:flex;gap:8px;margin-bottom:12px;}}
+.chart-tab-btn{{
+  padding:6px 14px;border-radius:8px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-size:13px;cursor:pointer;
+}}
+.chart-tab-btn.active{{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700;}}
+.chart-modal-subtitle{{font-size:12px;color:var(--muted);margin-bottom:8px;}}
+
+/* ── 비교 모드 토글 ── */
+.cmp-mode-row{{display:flex;gap:8px;margin-bottom:14px;}}
+.cmp-mode-btn{{
+  padding:7px 18px;border-radius:20px;border:1px solid var(--border);
+  background:none;color:var(--muted);font-size:13px;font-weight:700;cursor:pointer;
+  transition:all .18s;
+}}
+.cmp-mode-btn.active{{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+}}
+/* 날짜별 비교 - 날짜 체크박스 영역 */
+.date-pick-area{{
+  display:flex;flex-wrap:wrap;gap:7px;
+  max-height:120px;overflow-y:auto;padding:4px 0;margin-bottom:8px;
+}}
+.date-chip{{
+  padding:5px 13px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+  border:1px solid var(--border);background:rgba(255,255,255,.05);color:var(--muted);
+  white-space:nowrap;transition:all .15s;user-select:none;
+}}
+.date-chip:hover{{border-color:rgba(76,175,80,.5);color:var(--text);}}
+.date-chip.selected{{
+  background:linear-gradient(135deg,rgba(76,175,80,.25),rgba(76,175,80,.1));
+  border-color:var(--accent);color:var(--accent);
+}}
+@media(max-width:600px){{
+  .tab-cards{{grid-template-columns:1fr;}}
+  .tab-card-title{{font-size:14px;}}
+}}
+</style>
+</head>
+<body>
+<header class="main-header">
+  <div class="wrap">
+    <a href="index.html" class="back-link">← 홈으로</a>
+    <h1 class="main-title">🏦 KB부동산 데이터</h1>
+    <div class="sub">KB 거래 데이터 기반 지역별 통계 | {escape(now)}</div>
+    <div class="created-date">📅 제작일: {escape(now)}</div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ── 상단 탭 카드 ── -->
+  <div class="tab-cards">
+    <div class="tab-card active" id="tabCard0" onclick="switchTab(0)">
+      <span class="tab-card-icon">💰</span>
+      <div class="tab-card-title">지역별 평균평단가 비교</div>
+      <div class="tab-card-desc">KB 월간 데이터 · 지역 직접 선택<br>날짜별 평단가 차트</div>
+    </div>
+    <div class="tab-card" id="tabCard1" onclick="switchTab(1)">
+      <span class="tab-card-icon">📈</span>
+      <div class="tab-card-title">지역별 분위가격 비교</div>
+      <div class="tab-card-desc">최근 6개월 실거래 기준<br>Q1·중위·Q3·최고가 분포</div>
+    </div>
+    <div class="tab-card" id="tabCard2" onclick="switchTab(2)">
+      <span class="tab-card-icon">📉</span>
+      <div class="tab-card-title">날짜별 추이 비교</div>
+      <div class="tab-card-desc">지역 선택 후 기간별 평단가<br>추이를 라인차트로 비교</div>
+    </div>
+  </div>
+
+  <!-- ── 탭 패널 0: 지역별 평균평단가 (KB 월간 데이터) ── -->
+  <div class="tab-panel active" id="panel0">
+    <div class="chart-section">
+
+      <!-- 컨트롤 바 -->
+      <div class="chart-wrap" style="padding-bottom:16px;">
+        <div class="chart-wrap-title" style="margin-bottom:14px;">💰 지역별 평균 평단가 (만원/평) — KB 월간 데이터</div>
+
+        <!-- 비교 모드 선택 -->
+        <div class="cmp-mode-row">
+          <button class="cmp-mode-btn active" id="cmpModeRegion" onclick="pySwitchMode('region')">📍 지역별 비교</button>
+          <button class="cmp-mode-btn" id="cmpModeDate" onclick="pySwitchMode('date')">📅 날짜별 비교</button>
+        </div>
+
+        <!-- 지역별 비교 컨트롤 -->
+        <div id="pyCtrlRegion">
+          <div class="py-ctrl-row">
+            <div class="py-ctrl-left">
+              <select id="pyDateSel" class="py-search-input" style="width:150px;" onchange="pyDrawChart()">
+                <option value="">날짜 선택...</option>
+              </select>
+              <button class="py-preset-btn active" id="presetTop10" onclick="pyPreset(event,'top10')">TOP 10</button>
+              <button class="py-preset-btn" id="presetAll"   onclick="pyPreset(event,'all')">전체</button>
+              <button class="py-preset-btn" id="presetNone"  onclick="pyPreset(event,'none')">전체 해제</button>
+            </div>
+            <div class="py-ctrl-right">
+              <input type="text" id="pySearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="pyFilterChips()" />
+            </div>
+          </div>
+          <div id="pyChipArea" class="py-group-list"></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);">
+            <span id="pySelCount">0</span>개 선택됨 · 칩을 클릭해 선택/해제 · 그룹 헤더를 눌러 펼치기
+          </div>
+        </div>
+
+        <!-- 날짜별 비교 컨트롤 -->
+        <div id="pyCtrlDate" style="display:none;">
+          <div class="py-ctrl-row" style="margin-bottom:8px;">
+            <div class="py-ctrl-left">
+              <button class="py-preset-btn active" id="dtPresetTop5" onclick="pyDatePreset(event,'top5')">최근 5개</button>
+              <button class="py-preset-btn" id="dtPresetTop12" onclick="pyDatePreset(event,'top12')">최근 12개</button>
+              <button class="py-preset-btn" id="dtPresetAll" onclick="pyDatePreset(event,'all')">전체</button>
+              <button class="py-preset-btn" id="dtPresetNone" onclick="pyDatePreset(event,'none')">전체 해제</button>
+            </div>
+            <div class="py-ctrl-right">
+              <input type="text" id="pyDateSearch" placeholder="🔍 날짜 검색..." class="py-search-input" oninput="pyFilterDateChips()" />
+            </div>
+          </div>
+          <div id="pyDateChipArea" class="date-pick-area"></div>
+          <div style="margin-top:4px;font-size:12px;color:var(--muted);margin-bottom:10px;">
+            <span id="pyDateSelCount">0</span>개 날짜 선택됨 (2개 이상 선택 시 차트 표시)
+          </div>
+          <div class="py-ctrl-row">
+            <div class="py-ctrl-left">
+              <button class="py-preset-btn active" id="dtRegPresetTop5" onclick="pyDateRegPreset(event,'top5')">TOP 5 지역</button>
+              <button class="py-preset-btn" id="dtRegPresetTop10" onclick="pyDateRegPreset(event,'top10')">TOP 10 지역</button>
+              <button class="py-preset-btn" id="dtRegPresetNone" onclick="pyDateRegPreset(event,'none')">전체 해제</button>
+            </div>
+            <div class="py-ctrl-right">
+              <input type="text" id="pyDateRegSearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="pyFilterDateRegChips()" />
+            </div>
+          </div>
+          <div id="pyDateRegChipArea" class="py-group-list"></div>
+          <div style="margin-top:6px;font-size:12px;color:var(--muted);">
+            <span id="pyDateRegSelCount">0</span>개 지역 선택됨
+          </div>
+        </div>
+      </div>
+
+      <!-- 차트 -->
+      <div class="chart-wrap" id="pyChartWrap">
+        <canvas id="pyChart"></canvas>
+      </div>
+
+      <!-- 테이블 -->
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">📋 평단가 상세 수치</div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">순위</th>
+              <th style="text-align:left">지역</th>
+              <th>평단가 (만원/평)</th>
+            </tr>
+          </thead>
+          <tbody id="pyTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 탭 패널 1: 지역별 분위가격 ── -->
+  <div class="tab-panel" id="panel1">
+    <div class="chart-section">
+      <div class="chart-wrap">
+        <div class="chart-wrap-title">📈 시군구별 분위가격 (만원) — 최근 6개월 실거래 기준</div>
+        <canvas id="qtlChart" style="max-height:480px;"></canvas>
+      </div>
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">📋 분위가격 상세 테이블</div>
+        </div>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">순위</th>
+              <th style="text-align:left">시군구</th>
+              <th>Q1 하위25%</th>
+              <th>중위(50%)</th>
+              <th>Q3 상위25%</th>
+              <th>최고가</th>
+              <th>거래 건수</th>
+            </tr>
+          </thead>
+          <tbody id="qtlTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── 탭 패널 2: 날짜별 추이 비교 (라인차트) ── -->
+  <div class="tab-panel" id="panel2">
+    <div class="chart-section">
+
+      <div class="chart-wrap" style="padding-bottom:16px;">
+        <div class="chart-wrap-title" style="margin-bottom:14px;">📉 지역별 평단가 추이 비교 — KB 월간 데이터</div>
+
+        <div class="py-ctrl-row">
+          <div class="py-ctrl-left">
+            <button class="py-preset-btn active" id="trendPresetTop5" onclick="trendPreset(event,'top5')">TOP 5</button>
+            <button class="py-preset-btn" id="trendPresetTop10" onclick="trendPreset(event,'top10')">TOP 10</button>
+            <button class="py-preset-btn" id="trendPresetNone" onclick="trendPreset(event,'none')">전체 해제</button>
+          </div>
+          <div class="py-ctrl-right">
+            <input type="text" id="trendSearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="trendFilterChips()" />
+          </div>
+        </div>
+
+        <div id="trendChipArea" class="py-group-list"></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);">
+          <span id="trendSelCount">0</span>개 지역 선택됨 · 최대 12개 추천
+        </div>
+      </div>
+
+      <div class="chart-wrap" id="trendChartWrap" style="height:420px;">
+        <canvas id="trendChart"></canvas>
+      </div>
+
+      <div class="table-section">
+        <div class="table-header">
+          <div class="table-title">📋 지역별 최근 추이</div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table class="data-table" id="trendTable">
+            <thead><tr id="trendTableHead"></tr></thead>
+            <tbody id="trendTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<!-- KB 연간 차트 모달 -->
+<div id="chartModal" class="chart-modal-overlay" onclick="if(event.target===this)closeChartModal()">
+  <div class="chart-modal">
+    <div class="chart-modal-header">
+      <span class="chart-modal-title" id="chartModalTitle">지역 차트</span>
+      <button class="chart-modal-close" onclick="closeChartModal()">✕</button>
+    </div>
+    <div class="chart-tabs">
+      <button class="chart-tab-btn active" data-tab="weekly"  onclick="switchChartTab('weekly')">주간 (52주)</button>
+      <button class="chart-tab-btn"        data-tab="monthly" onclick="switchChartTab('monthly')">월간</button>
+      <button class="chart-tab-btn"        data-tab="yearly"  onclick="switchChartTab('yearly')">연간</button>
+    </div>
+    <div class="chart-modal-subtitle" id="chartModalSubtitle"></div>
+    <canvas id="regionChart" style="max-height:400px;"></canvas>
+  </div>
+</div>
+
+<script>
+// ── 데이터 ──
+const KB_ANNUAL_DATA      = {kb_annual_data_json};
+const PY_STATS            = {py_stats_json};
+const QTL_STATS           = {qtl_stats_json};
+const KB_MONTHLY_REGIONS  = {kb_monthly_regions_json};
+const KB_MONTHLY_DATES    = {kb_monthly_dates_json};
+const KB_REGION_GROUPS    = {kb_region_groups_json};
+
+// ── KB 월간 차트 파일명 (Python에서 주입) ──
+const KB_MONTHLY_CHART_FILE = '{kb_monthly_chart_filename}';
+
+// ── 탭 전환 ──
+function switchTab(idx) {{
+  for (var i = 0; i < 3; i++) {{
+    document.getElementById('tabCard' + i).classList.toggle('active', i === idx);
+    document.getElementById('panel' + i).classList.toggle('active', i === idx);
+  }}
+  if (idx === 0 && !pyInitDone) renderPyChart();
+  if (idx === 1) renderQtlChart();
+  if (idx === 2) renderTrendChart();
+}}
+
+// ── 탭0: KB 월간 지역 선택 평단가 비교 차트 ──
+var pyChartInstance = null;
+var pySelectedSet   = new Set();
+var pyInitDone      = false;
+var pyCmpMode       = 'region'; // 'region' | 'date'
+
+// 날짜별 비교 모드용
+var pyDateSelectedSet    = new Set();
+var pyDateRegSelectedSet = new Set();
+var pyDateRegInitDone    = false;
+
+var pyRegionNames = Object.keys(KB_MONTHLY_REGIONS);
+
+function pyGetValue(name, dateIdx) {{
+  var arr = KB_MONTHLY_REGIONS[name];
+  if (!arr) return null;
+  var v = (dateIdx >= 0 && dateIdx < arr.length) ? arr[dateIdx] : arr[arr.length - 1];
+  return (v === null || v === undefined) ? null : v;
+}}
+
+function pyCurrentDateIdx() {{
+  var sel = document.getElementById('pyDateSel');
+  return sel ? parseInt(sel.value, 10) : KB_MONTHLY_DATES.length - 1;
+}}
+
+function pyInitDateSelect() {{
+  var sel = document.getElementById('pyDateSel');
+  if (!sel) return;
+  sel.innerHTML = '';
+  KB_MONTHLY_DATES.forEach(function(d, i) {{
+    var opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = d;
+    if (i === KB_MONTHLY_DATES.length - 1) opt.selected = true;
+    sel.appendChild(opt);
+  }});
+}}
+
+function pyInitChips() {{
+  var area = document.getElementById('pyChipArea');
+  if (!area) return;
+  area.innerHTML = '';
+
+  var groups = (KB_REGION_GROUPS && KB_REGION_GROUPS.length > 0)
+    ? KB_REGION_GROUPS
+    : [{{group:'전체', regions: pyRegionNames}}];
+
+  groups.forEach(function(grpObj) {{
+    var validRegions = grpObj.regions.filter(function(r) {{ return KB_MONTHLY_REGIONS[r]; }});
+    if (validRegions.length === 0) return;
+
+    var grpEl = document.createElement('div');
+    grpEl.className = 'py-group';
+    grpEl.dataset.group = grpObj.group;
+
+    var selCount = validRegions.filter(function(r) {{ return pySelectedSet.has(r); }}).length;
+    var allSel = selCount === validRegions.length;
+
+    var headerEl = document.createElement('div');
+    headerEl.className = 'py-group-header';
+    headerEl.innerHTML =
+      '<span class="py-group-arrow">▶</span>' +
+      '<span class="py-group-name">' + grpObj.group + '</span>' +
+      '<span class="py-group-count">(' + validRegions.length + '개' + (selCount > 0 ? ' · ' + selCount + '선택' : '') + ')</span>' +
+      '<button class="py-group-sel-btn" data-group="' + grpObj.group + '">' +
+        (allSel ? '전체해제' : '전체선택') + '</button>';
+    headerEl.querySelector('.py-group-arrow').addEventListener('click', function(e) {{
+      e.stopPropagation();
+      pyToggleGroup(grpEl);
+    }});
+    headerEl.addEventListener('click', function(e) {{
+      if (e.target.classList.contains('py-group-sel-btn')) return;
+      pyToggleGroup(grpEl);
+    }});
+    headerEl.querySelector('.py-group-sel-btn').addEventListener('click', function(e) {{
+      e.stopPropagation();
+      pySelectGroup(grpObj.group, grpEl);
+    }});
+
+    var chipsEl = document.createElement('div');
+    chipsEl.className = 'py-group-chips';
+    validRegions.forEach(function(name) {{
+      var chip = document.createElement('span');
+      chip.className = 'py-chip' + (pySelectedSet.has(name) ? ' selected' : '');
+      chip.textContent = name;
+      chip.dataset.name = name;
+      chip.addEventListener('click', function() {{ pyToggleChip(name, chip); }});
+      chipsEl.appendChild(chip);
+    }});
+
+    grpEl.appendChild(headerEl);
+    grpEl.appendChild(chipsEl);
+    area.appendChild(grpEl);
+  }});
+  pyUpdateSelCount();
+}}
+
+function pyToggleGroup(grpEl) {{
+  var chipsEl = grpEl.querySelector('.py-group-chips');
+  var arrowEl = grpEl.querySelector('.py-group-arrow');
+  var isOpen = chipsEl.classList.toggle('open');
+  arrowEl.classList.toggle('open', isOpen);
+}}
+
+function pySelectGroup(groupName, grpEl) {{
+  var chipsEl = grpEl.querySelector('.py-group-chips');
+  var chips = chipsEl.querySelectorAll('.py-chip');
+  var allSel = Array.from(chips).every(function(c) {{ return pySelectedSet.has(c.dataset.name); }});
+  chips.forEach(function(chip) {{
+    var name = chip.dataset.name;
+    if (allSel) {{
+      pySelectedSet.delete(name);
+      chip.classList.remove('selected');
+    }} else {{
+      pySelectedSet.add(name);
+      chip.classList.add('selected');
+    }}
+  }});
+  // 버튼 텍스트 업데이트
+  var btn = grpEl.querySelector('.py-group-sel-btn');
+  if (btn) btn.textContent = allSel ? '전체선택' : '전체해제';
+  var countEl = grpEl.querySelector('.py-group-count');
+  if (countEl) {{
+    var cnt = Array.from(chips).filter(function(c){{return pySelectedSet.has(c.dataset.name);}}).length;
+    countEl.textContent = '(' + chips.length + '개' + (cnt > 0 ? ' · ' + cnt + '선택' : '') + ')';
+  }}
+  pyUpdateSelCount();
+  pyDrawChart();
+}}
+
+function pyToggleChip(name, chipEl) {{
+  if (pySelectedSet.has(name)) {{
+    pySelectedSet.delete(name);
+    chipEl.classList.remove('selected');
+  }} else {{
+    pySelectedSet.add(name);
+    chipEl.classList.add('selected');
+  }}
+  // 그룹 카운트 & 버튼 라벨 업데이트
+  var grpEl = chipEl.closest('.py-group');
+  if (grpEl) {{
+    var chips = grpEl.querySelectorAll('.py-chip');
+    var cnt = Array.from(chips).filter(function(c){{return pySelectedSet.has(c.dataset.name);}}).length;
+    var countEl = grpEl.querySelector('.py-group-count');
+    if (countEl) countEl.textContent = '(' + chips.length + '개' + (cnt > 0 ? ' · ' + cnt + '선택' : '') + ')';
+    var btn = grpEl.querySelector('.py-group-sel-btn');
+    if (btn) btn.textContent = (cnt === chips.length) ? '전체해제' : '전체선택';
+  }}
+  pyUpdateSelCount();
+  pyDrawChart();
+}}
+
+// 묶인 지역(집계단위) 여부 판별
+function pyIsGroupedRegion(name) {{
+  return /\d+개[구시군]/.test(name) || /전국|특별시|광역시/.test(name);
+}}
+
+function pyPreset(evt, type) {{
+  document.querySelectorAll('.py-preset-btn').forEach(function(b){{b.classList.remove('active');}});
+  evt.currentTarget.classList.add('active');
+  pySelectedSet.clear();
+  var dateIdx = pyCurrentDateIdx();
+  if (type === 'top10') {{
+    // 현재 날짜 기준 상위 10 (묶인 지역 제외)
+    var scored = pyRegionNames
+      .filter(function(n){{ return !pyIsGroupedRegion(n); }})
+      .map(function(n){{ return {{name:n, val: pyGetValue(n, dateIdx) || 0}}; }})
+      .sort(function(a,b){{return b.val - a.val;}});
+    scored.slice(0,10).forEach(function(s){{pySelectedSet.add(s.name);}});
+  }} else if (type === 'all') {{
+    pyRegionNames.forEach(function(n){{pySelectedSet.add(n);}});
+  }}
+  pyInitChips();
+  pyDrawChart();
+}}
+
+// ── 비교 모드 전환 ──
+function pySwitchMode(mode) {{
+  pyCmpMode = mode;
+  document.getElementById('cmpModeRegion').classList.toggle('active', mode === 'region');
+  document.getElementById('cmpModeDate').classList.toggle('active', mode === 'date');
+  document.getElementById('pyCtrlRegion').style.display = mode === 'region' ? '' : 'none';
+  document.getElementById('pyCtrlDate').style.display   = mode === 'date'   ? '' : 'none';
+  if (mode === 'date') {{
+    pyInitDateChips();
+    pyInitDateRegChips();
+    pyDrawDateChart();
+  }} else {{
+    pyDrawChart();
+  }}
+}}
+
+// ── 날짜별 비교: 날짜 칩 ──
+function pyInitDateChips() {{
+  var area = document.getElementById('pyDateChipArea');
+  if (!area) return;
+  area.innerHTML = '';
+  KB_MONTHLY_DATES.forEach(function(d, i) {{
+    var chip = document.createElement('span');
+    chip.className = 'date-chip' + (pyDateSelectedSet.has(String(i)) ? ' selected' : '');
+    chip.textContent = d;
+    chip.dataset.idx = i;
+    chip.addEventListener('click', function() {{ pyToggleDateChip(String(i), chip); }});
+    area.appendChild(chip);
+  }});
+  pyUpdateDateSelCount();
+}}
+
+function pyToggleDateChip(idx, chip) {{
+  if (pyDateSelectedSet.has(idx)) {{ pyDateSelectedSet.delete(idx); chip.classList.remove('selected'); }}
+  else {{ pyDateSelectedSet.add(idx); chip.classList.add('selected'); }}
+  pyUpdateDateSelCount();
+  pyDrawDateChart();
+}}
+
+function pyUpdateDateSelCount() {{
+  var el = document.getElementById('pyDateSelCount');
+  if (el) el.textContent = pyDateSelectedSet.size;
+}}
+
+function pyFilterDateChips() {{
+  var q = (document.getElementById('pyDateSearch').value || '').trim().toLowerCase();
+  document.querySelectorAll('#pyDateChipArea .date-chip').forEach(function(chip) {{
+    chip.style.display = (!q || chip.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  }});
+}}
+
+function pyDatePreset(e, type) {{
+  document.querySelectorAll('.py-preset-btn[id^="dtPreset"]').forEach(function(b) {{ b.classList.remove('active'); }});
+  e.currentTarget.classList.add('active');
+  pyDateSelectedSet.clear();
+  var len = KB_MONTHLY_DATES.length;
+  if (type === 'top5') {{
+    for (var i = Math.max(0, len - 5); i < len; i++) pyDateSelectedSet.add(String(i));
+  }} else if (type === 'top12') {{
+    for (var i = Math.max(0, len - 12); i < len; i++) pyDateSelectedSet.add(String(i));
+  }} else if (type === 'all') {{
+    for (var i = 0; i < len; i++) pyDateSelectedSet.add(String(i));
+  }}
+  pyInitDateChips();
+  pyDrawDateChart();
+}}
+
+// ── 날짜별 비교: 지역 칩 ──
+function pyInitDateRegChips() {{
+  if (pyDateRegInitDone) return;
+  pyDateRegInitDone = true;
+  var lastIdx = KB_MONTHLY_DATES.length - 1;
+  var scored = pyRegionNames
+    .filter(function(n){{ return !pyIsGroupedRegion(n); }})
+    .map(function(n){{ return {{name: n, val: pyGetValue(n, lastIdx) || 0}}; }})
+    .sort(function(a, b){{ return b.val - a.val; }});
+  scored.slice(0, 5).forEach(function(s){{ pyDateRegSelectedSet.add(s.name); }});
+  pyRenderDateRegChips();
+}}
+
+function pyRenderDateRegChips() {{
+  var area = document.getElementById('pyDateRegChipArea');
+  if (!area) return;
+  area.innerHTML = '';
+  var groups = (KB_REGION_GROUPS && KB_REGION_GROUPS.length > 0)
+    ? KB_REGION_GROUPS
+    : [{{group:'전체', regions: pyRegionNames}}];
+
+  groups.forEach(function(grpObj) {{
+    var validRegions = grpObj.regions.filter(function(r){{ return KB_MONTHLY_REGIONS[r]; }});
+    if (validRegions.length === 0) return;
+    var grpEl = document.createElement('div');
+    grpEl.className = 'py-group';
+    var selCount = validRegions.filter(function(r){{ return pyDateRegSelectedSet.has(r); }}).length;
+    var headerEl = document.createElement('div');
+    headerEl.className = 'py-group-header';
+    headerEl.innerHTML =
+      '<span class="py-group-arrow">▶</span>' +
+      '<span class="py-group-name">' + grpObj.group + '</span>' +
+      '<span class="py-group-count">(' + validRegions.length + '개' + (selCount > 0 ? ' · ' + selCount + '선택' : '') + ')</span>' +
+      '<button class="py-group-sel-btn">' + (selCount === validRegions.length ? '전체해제' : '전체선택') + '</button>';
+    headerEl.querySelector('.py-group-arrow').addEventListener('click', function(e) {{
+      e.stopPropagation(); pyToggleGroup(grpEl);
+    }});
+    headerEl.addEventListener('click', function(e) {{
+      if (e.target.classList.contains('py-group-sel-btn')) return;
+      pyToggleGroup(grpEl);
+    }});
+    headerEl.querySelector('.py-group-sel-btn').addEventListener('click', function(e) {{
+      e.stopPropagation();
+      var isAll = validRegions.every(function(r){{ return pyDateRegSelectedSet.has(r); }});
+      validRegions.forEach(function(r){{ isAll ? pyDateRegSelectedSet.delete(r) : pyDateRegSelectedSet.add(r); }});
+      pyRenderDateRegChips(); pyDrawDateChart();
+    }});
+    var chipsEl = document.createElement('div');
+    chipsEl.className = 'py-group-chips';
+    validRegions.forEach(function(name) {{
+      var chip = document.createElement('span');
+      chip.className = 'py-chip' + (pyDateRegSelectedSet.has(name) ? ' selected' : '');
+      chip.textContent = name;
+      chip.addEventListener('click', function() {{
+        if (pyDateRegSelectedSet.has(name)) {{ pyDateRegSelectedSet.delete(name); chip.classList.remove('selected'); }}
+        else {{ pyDateRegSelectedSet.add(name); chip.classList.add('selected'); }}
+        pyUpdateDateRegSelCount(); pyDrawDateChart();
+      }});
+      chipsEl.appendChild(chip);
+    }});
+    grpEl.appendChild(headerEl); grpEl.appendChild(chipsEl); area.appendChild(grpEl);
+  }});
+  pyUpdateDateRegSelCount();
+}}
+
+function pyUpdateDateRegSelCount() {{
+  var el = document.getElementById('pyDateRegSelCount');
+  if (el) el.textContent = pyDateRegSelectedSet.size;
+}}
+
+function pyFilterDateRegChips() {{
+  var q = (document.getElementById('pyDateRegSearch').value || '').trim().toLowerCase();
+  document.querySelectorAll('#pyDateRegChipArea .py-chip').forEach(function(chip) {{
+    chip.classList.toggle('hidden', !!(q && !chip.textContent.toLowerCase().includes(q)));
+  }});
+}}
+
+function pyDateRegPreset(e, type) {{
+  document.querySelectorAll('.py-preset-btn[id^="dtRegPreset"]').forEach(function(b){{ b.classList.remove('active'); }});
+  e.currentTarget.classList.add('active');
+  pyDateRegSelectedSet.clear();
+  if (type !== 'none') {{
+    var n = type === 'top5' ? 5 : 10;
+    var lastIdx = KB_MONTHLY_DATES.length - 1;
+    var scored = pyRegionNames
+      .filter(function(nm){{ return !pyIsGroupedRegion(nm); }})
+      .map(function(nm){{ return {{name: nm, val: pyGetValue(nm, lastIdx) || 0}}; }})
+      .sort(function(a, b){{ return b.val - a.val; }});
+    scored.slice(0, n).forEach(function(s){{ pyDateRegSelectedSet.add(s.name); }});
+  }}
+  pyRenderDateRegChips(); pyDrawDateChart();
+}}
+
+// ── 날짜별 비교 차트 (grouped 막대) ──
+var DATE_PALETTE = [
+  'rgba(76,175,80,0.82)','rgba(33,150,243,0.82)','rgba(255,152,0,0.82)',
+  'rgba(244,67,54,0.82)','rgba(156,39,176,0.82)','rgba(0,188,212,0.82)',
+  'rgba(255,235,59,0.82)','rgba(233,30,99,0.82)','rgba(139,195,74,0.82)',
+  'rgba(255,87,34,0.82)','rgba(63,81,181,0.82)','rgba(121,85,72,0.82)',
+];
+var DATE_BORDER = [
+  '#4caf50','#2196f3','#ff9800','#f44336','#9c27b0','#00bcd4',
+  '#ffeb3b','#e91e63','#8bc34a','#ff5722','#3f51b5','#795548',
+];
+
+function pyDrawDateChart() {{
+  var selDates = Array.from(pyDateSelectedSet).map(Number).sort(function(a,b){{return a-b;}});
+  var selRegions = Array.from(pyDateRegSelectedSet);
+  var canvas = document.getElementById('pyChart');
+
+  // 테이블 헤더 복원 (날짜×지역 형식)
+  var thead = document.querySelector('#panel0 .data-table thead tr');
+  if (thead) {{
+    thead.innerHTML = '<th style="text-align:left">순위</th><th style="text-align:left">지역</th>'
+      + selDates.map(function(dIdx){{ return '<th>' + (KB_MONTHLY_DATES[dIdx]||'') + '</th>'; }}).join('');
+  }}
+
+  if (selDates.length < 2 || selRegions.length === 0) {{
+    if (pyChartInstance) {{ pyChartInstance.destroy(); pyChartInstance = null; }}
+    canvas.style.display = 'none';
+    document.getElementById('pyTableBody').innerHTML = '';
+    return;
+  }}
+  canvas.style.display = '';
+
+  var datasets = selDates.map(function(dIdx, ci) {{
+    return {{
+      label: KB_MONTHLY_DATES[dIdx] || '',
+      data: selRegions.map(function(name){{ return pyGetValue(name, dIdx); }}),
+      backgroundColor: DATE_PALETTE[ci % DATE_PALETTE.length],
+      borderColor: DATE_BORDER[ci % DATE_BORDER.length],
+      borderWidth: 2, borderRadius: 5, borderSkipped: false,
+    }};
+  }});
+
+  var canvasH = Math.max(340, Math.min(selRegions.length * 52 + 80, 700));
+  var wrap = canvas.parentNode;
+  wrap.style.height = canvasH + 'px';
+  canvas.style.maxHeight = 'none';
+
+  if (pyChartInstance) {{ pyChartInstance.destroy(); pyChartInstance = null; }}
+  pyChartInstance = new Chart(canvas.getContext('2d'), {{
+    type: 'bar',
+    data: {{ labels: selRegions, datasets: datasets }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      animation: {{duration:350, easing:'easeOutQuart'}},
+      plugins: {{
+        legend: {{ display:true, labels:{{color:'rgba(232,234,240,0.9)',font:{{size:12}}}} }},
+        title: {{ display:true, text:'📅 날짜별 평단가 비교 (만원/평)',
+          color:'rgba(232,234,240,0.9)', font:{{size:15,weight:'700'}}, padding:{{bottom:14}} }},
+        tooltip: {{
+          backgroundColor:'rgba(21,24,34,0.95)', borderColor:'rgba(255,255,255,0.1)',
+          borderWidth:1, titleColor:'#e8eaf0', bodyColor:'#96a0b5', padding:12,
+          callbacks: {{ label: function(c){{ return '  '+c.dataset.label+': '+Math.round(c.parsed.y).toLocaleString()+' 만원/평'; }} }}
+        }}
+      }},
+      scales: {{
+        x: {{ ticks:{{color:'rgba(255,255,255,0.85)',font:{{size:11}},maxRotation:45,minRotation:30}},
+              grid:{{display:false}}, border:{{color:'rgba(255,255,255,0.08)'}} }},
+        y: {{ title:{{display:true,text:'만원/평',color:'rgba(150,160,181,0.7)',font:{{size:11}}}},
+              ticks:{{color:'rgba(150,160,181,0.9)',callback:function(v){{return v.toLocaleString();}}}},
+              grid:{{color:'rgba(255,255,255,0.06)'}}, border:{{color:'rgba(255,255,255,0.08)'}} }}
+      }}
+    }}
+  }});
+
+  document.getElementById('pyTableBody').innerHTML = selRegions.map(function(name, i) {{
+    var vals = selDates.map(function(dIdx) {{
+      var v = pyGetValue(name, dIdx);
+      return '<td style="text-align:right"><strong>'+(v!==null?Math.round(v).toLocaleString():'-')+'</strong></td>';
+    }}).join('');
+    return '<tr><td>'+(i+1)+'</td><td>'+name+'</td>'+vals+'</tr>';
+  }}).join('');
+}}
+
+function pyFilterChips() {{
+  var q = document.getElementById('pySearch').value.trim().toLowerCase();
+  document.querySelectorAll('#pyChipArea .py-group').forEach(function(grpEl) {{
+    var chipsEl = grpEl.querySelector('.py-group-chips');
+    var arrowEl = grpEl.querySelector('.py-group-arrow');
+    var anyVisible = false;
+    grpEl.querySelectorAll('.py-chip').forEach(function(chip) {{
+      var match = q.length === 0 || chip.dataset.name.toLowerCase().indexOf(q) !== -1;
+      chip.classList.toggle('hidden', !match);
+      if (match) anyVisible = true;
+    }});
+    grpEl.classList.toggle('group-hidden', !anyVisible);
+    if (q.length > 0 && anyVisible) {{
+      chipsEl.classList.add('open');
+      arrowEl.classList.add('open');
+    }}
+  }});
+}}
+
+function pyUpdateSelCount() {{
+  var el = document.getElementById('pySelCount');
+  if (el) el.textContent = pySelectedSet.size;
+}}
+
+function pyDrawChart() {{
+  var dateIdx  = pyCurrentDateIdx();
+  var dateLabel = KB_MONTHLY_DATES[dateIdx] || '';
+
+  // 선택된 지역 + 값 수집
+  var pairs = [];
+  pySelectedSet.forEach(function(name) {{
+    var v = pyGetValue(name, dateIdx);
+    if (v !== null && v > 0) pairs.push({{name:name, val:v}});
+  }});
+  pairs.sort(function(a,b){{return b.val - a.val;}});
+
+  // 테이블 헤더 복원 (날짜별 비교 후 헤더가 바뀌었을 수 있음)
+  var thead = document.querySelector('#panel0 .data-table thead tr');
+  if (thead) {{
+    thead.innerHTML = '<th style="text-align:left">순위</th><th style="text-align:left">지역</th><th>평단가 (만원/평)</th>';
+  }}
+  // 테이블 업데이트
+  document.getElementById('pyTableBody').innerHTML = pairs.map(function(p, i) {{
+    return '<tr><td>'+(i+1)+'</td><td>'+p.name+'</td>'
+      +'<td style="text-align:right"><strong>'+Math.round(p.val).toLocaleString()+'</strong></td></tr>';
+  }}).join('');
+
+  if (pairs.length === 0) {{
+    if (pyChartInstance) {{ pyChartInstance.destroy(); pyChartInstance = null; }}
+    document.getElementById('pyChart').style.display = 'none';
+    return;
+  }}
+  document.getElementById('pyChart').style.display = '';
+
+  var labels  = pairs.map(function(p){{return p.name;}});
+  var values  = pairs.map(function(p){{return p.val;}});
+  var maxVal  = Math.max.apply(null, values);
+  var bgColors = values.map(function(v){{
+    var r = v / maxVal;
+    if (r >= 0.85) return 'rgba(244,67,54,0.85)';
+    if (r >= 0.70) return 'rgba(255,152,0,0.85)';
+    if (r >= 0.50) return 'rgba(76,175,80,0.80)';
+    return 'rgba(33,150,243,0.75)';
+  }});
+  var bdColors = values.map(function(v){{
+    var r = v / maxVal;
+    if (r >= 0.85) return '#f44336';
+    if (r >= 0.70) return '#ff9800';
+    if (r >= 0.50) return '#4caf50';
+    return '#2196f3';
+  }});
+
+  var canvasH = Math.max(340, Math.min(pairs.length * 52 + 80, 680));
+  var wrap = document.getElementById('pyChart').parentNode;
+  wrap.style.height = canvasH + 'px';
+  document.getElementById('pyChart').style.maxHeight = 'none';
+
+  if (pyChartInstance) {{ pyChartInstance.destroy(); pyChartInstance = null; }}
+  pyChartInstance = new Chart(document.getElementById('pyChart').getContext('2d'), {{
+    type: 'bar',
+    data: {{
+      labels: labels,
+      datasets: [{{
+        label: '평단가(만원/평) · ' + dateLabel,
+        data: values,
+        backgroundColor: bgColors,
+        borderColor: bdColors,
+        borderWidth: 2,
+        borderRadius: 6,
+        borderSkipped: false,
+      }}]
+    }},
+    options: {{
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: {{duration: 350, easing: 'easeOutQuart'}},
+      plugins: {{
+        legend: {{display: false}},
+        title: {{
+          display: true,
+          text: '📅 ' + dateLabel + '  기준  평단가 (만원/평)',
+          color: 'rgba(232,234,240,0.9)',
+          font: {{size: 15, weight: '700'}},
+          padding: {{bottom: 14}},
+        }},
+        tooltip: {{
+          backgroundColor: 'rgba(21,24,34,0.95)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e8eaf0',
+          bodyColor: '#96a0b5',
+          padding: 12,
+          callbacks: {{
+            label: function(c) {{
+              return '  ' + Math.round(c.parsed.y).toLocaleString() + ' 만원/평';
+            }}
+          }}
+        }}
+      }},
+      scales: {{
+        x: {{
+          ticks: {{
+            color:'rgba(255,255,255,0.85)',
+            font:{{size:11}},
+            maxRotation: 45,
+            minRotation: 30,
+          }},
+          grid:  {{display:false}},
+          border:{{color:'rgba(255,255,255,0.08)'}}
+        }},
+        y: {{
+          title: {{display:true, text:'만원/평', color:'rgba(150,160,181,0.7)', font:{{size:11}}}},
+          ticks: {{color:'rgba(150,160,181,0.9)', callback:function(v){{return v.toLocaleString();}}}},
+          grid:  {{color:'rgba(255,255,255,0.06)'}},
+          border:{{color:'rgba(255,255,255,0.08)'}}
+        }}
+      }}
+    }}
+  }});
+}}
+
+function renderPyChart() {{
+  if (!pyInitDone) {{
+    pyInitDone = true;
+    pyInitDateSelect();
+    // 초기: 현재 날짜 기준 TOP10 (묶인 지역 제외)
+    var dateIdx = pyCurrentDateIdx();
+    var scored = pyRegionNames
+      .filter(function(n){{ return !pyIsGroupedRegion(n); }})
+      .map(function(n){{ return {{name:n, val: pyGetValue(n, dateIdx)||0}}; }})
+      .sort(function(a,b){{return b.val-a.val;}});
+    scored.slice(0,10).forEach(function(s){{pySelectedSet.add(s.name);}});
+    // 날짜별 비교 초기: 최근 5개 날짜
+    var len = KB_MONTHLY_DATES.length;
+    for (var i = Math.max(0, len - 5); i < len; i++) pyDateSelectedSet.add(String(i));
+  }}
+  if (pyRegionNames.length === 0) {{
+    document.getElementById('panel0').innerHTML =
+      '<div class="no-data">📭 평단가 데이터가 없습니다.<br><small>설정에서 KB 월간 데이터 파일을 지정한 후 HTML을 다시 생성해주세요.</small></div>';
+    return;
+  }}
+  pyInitChips();
+  pyDrawChart();
+}}
+
+// ── 탭2: 날짜별 추이 비교 (라인차트) ──
+var trendChartInstance = null;
+var trendSelectedSet   = new Set();
+var trendInitDone      = false;
+
+var TREND_LINE_COLORS = [
+  '#4caf50','#2196f3','#ff9800','#f44336','#9c27b0',
+  '#00bcd4','#ffeb3b','#e91e63','#8bc34a','#ff5722','#3f51b5','#795548',
+];
+
+function trendPreset(e, type) {{
+  document.querySelectorAll('.py-preset-btn[id^="trendPreset"]').forEach(function(b){{ b.classList.remove('active'); }});
+  e.currentTarget.classList.add('active');
+  trendSelectedSet.clear();
+  if (type !== 'none') {{
+    var n = type === 'top5' ? 5 : 10;
+    var lastIdx = KB_MONTHLY_DATES.length - 1;
+    var scored = Object.keys(KB_MONTHLY_REGIONS)
+      .filter(function(nm){{ return !pyIsGroupedRegion(nm); }})
+      .map(function(nm){{ return {{name: nm, val: pyGetValue(nm, lastIdx) || 0}}; }})
+      .sort(function(a,b){{ return b.val - a.val; }});
+    scored.slice(0, n).forEach(function(s){{ trendSelectedSet.add(s.name); }});
+  }}
+  trendRenderChips();
+  trendDraw();
+}}
+
+function trendFilterChips() {{
+  var q = (document.getElementById('trendSearch').value || '').trim().toLowerCase();
+  document.querySelectorAll('#trendChipArea .py-chip').forEach(function(chip) {{
+    chip.classList.toggle('hidden', !!(q && !chip.textContent.toLowerCase().includes(q)));
+  }});
+}}
+
+function trendRenderChips() {{
+  var area = document.getElementById('trendChipArea');
+  if (!area) return;
+  area.innerHTML = '';
+  var groups = (KB_REGION_GROUPS && KB_REGION_GROUPS.length > 0)
+    ? KB_REGION_GROUPS
+    : [{{group:'전체', regions: Object.keys(KB_MONTHLY_REGIONS)}}];
+
+  groups.forEach(function(grpObj) {{
+    var validRegions = grpObj.regions.filter(function(r){{ return KB_MONTHLY_REGIONS[r]; }});
+    if (validRegions.length === 0) return;
+    var grpEl = document.createElement('div');
+    grpEl.className = 'py-group';
+    var selCount = validRegions.filter(function(r){{ return trendSelectedSet.has(r); }}).length;
+    var headerEl = document.createElement('div');
+    headerEl.className = 'py-group-header';
+    headerEl.innerHTML =
+      '<span class="py-group-arrow">▶</span>' +
+      '<span class="py-group-name">' + grpObj.group + '</span>' +
+      '<span class="py-group-count">(' + validRegions.length + '개' + (selCount > 0 ? ' · ' + selCount + '선택' : '') + ')</span>' +
+      '<button class="py-group-sel-btn">' + (selCount === validRegions.length ? '전체해제' : '전체선택') + '</button>';
+    headerEl.querySelector('.py-group-arrow').addEventListener('click', function(e){{
+      e.stopPropagation(); pyToggleGroup(grpEl);
+    }});
+    headerEl.addEventListener('click', function(e){{
+      if (e.target.classList.contains('py-group-sel-btn')) return;
+      pyToggleGroup(grpEl);
+    }});
+    headerEl.querySelector('.py-group-sel-btn').addEventListener('click', function(e){{
+      e.stopPropagation();
+      var isAll = validRegions.every(function(r){{ return trendSelectedSet.has(r); }});
+      validRegions.forEach(function(r){{ isAll ? trendSelectedSet.delete(r) : trendSelectedSet.add(r); }});
+      trendRenderChips(); trendDraw();
+    }});
+    var chipsEl = document.createElement('div');
+    chipsEl.className = 'py-group-chips';
+    validRegions.forEach(function(name) {{
+      var chip = document.createElement('span');
+      chip.className = 'py-chip' + (trendSelectedSet.has(name) ? ' selected' : '');
+      chip.textContent = name;
+      chip.addEventListener('click', function(){{
+        if (trendSelectedSet.has(name)) {{ trendSelectedSet.delete(name); chip.classList.remove('selected'); }}
+        else {{ trendSelectedSet.add(name); chip.classList.add('selected'); }}
+        trendUpdateSelCount(); trendDraw();
+      }});
+      chipsEl.appendChild(chip);
+    }});
+    grpEl.appendChild(headerEl); grpEl.appendChild(chipsEl); area.appendChild(grpEl);
+  }});
+  trendUpdateSelCount();
+}}
+
+function trendUpdateSelCount() {{
+  var el = document.getElementById('trendSelCount');
+  if (el) el.textContent = trendSelectedSet.size;
+}}
+
+function trendDraw() {{
+  var regions = Array.from(trendSelectedSet);
+  var canvas  = document.getElementById('trendChart');
+  if (regions.length === 0) {{
+    if (trendChartInstance) {{ trendChartInstance.destroy(); trendChartInstance = null; }}
+    canvas.style.display = 'none';
+    document.getElementById('trendTableHead').innerHTML = '';
+    document.getElementById('trendTableBody').innerHTML = '';
+    return;
+  }}
+  canvas.style.display = '';
+
+  var datasets = regions.map(function(name, ci) {{
+    var color = TREND_LINE_COLORS[ci % TREND_LINE_COLORS.length];
+    return {{
+      label: name,
+      data: KB_MONTHLY_DATES.map(function(_, i){{ return pyGetValue(name, i); }}),
+      borderColor: color,
+      backgroundColor: 'transparent',
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 6,
+      tension: 0.3,
+      fill: false,
+      spanGaps: true,
+    }};
+  }});
+
+  document.getElementById('trendChartWrap').style.height = '420px';
+
+  if (trendChartInstance) {{ trendChartInstance.destroy(); trendChartInstance = null; }}
+  trendChartInstance = new Chart(canvas.getContext('2d'), {{
+    type: 'line',
+    data: {{ labels: KB_MONTHLY_DATES, datasets: datasets }},
+    options: {{
+      responsive: true, maintainAspectRatio: false,
+      animation: {{duration:350, easing:'easeOutQuart'}},
+      interaction: {{mode:'index', intersect:false}},
+      plugins: {{
+        legend: {{ display:true, labels:{{color:'rgba(232,234,240,0.9)',font:{{size:12}},boxWidth:14}} }},
+        title: {{ display:true, text:'📉 지역별 평단가 추이 (만원/평)',
+          color:'rgba(232,234,240,0.9)', font:{{size:15,weight:'700'}}, padding:{{bottom:14}} }},
+        tooltip: {{
+          backgroundColor:'rgba(21,24,34,0.95)', borderColor:'rgba(255,255,255,0.1)',
+          borderWidth:1, titleColor:'#e8eaf0', bodyColor:'#96a0b5', padding:12,
+          callbacks: {{ label: function(c){{
+            var v = c.parsed.y;
+            return '  '+c.dataset.label+': '+(v!==null?Math.round(v).toLocaleString()+' 만원/평':'-');
+          }} }}
+        }}
+      }},
+      scales: {{
+        x: {{ ticks:{{color:'rgba(255,255,255,0.75)',font:{{size:11}},maxRotation:45,minRotation:30,maxTicksLimit:24}},
+              grid:{{color:'rgba(255,255,255,0.04)'}}, border:{{color:'rgba(255,255,255,0.08)'}} }},
+        y: {{ title:{{display:true,text:'만원/평',color:'rgba(150,160,181,0.7)',font:{{size:11}}}},
+              ticks:{{color:'rgba(150,160,181,0.9)',callback:function(v){{return v.toLocaleString();}}}},
+              grid:{{color:'rgba(255,255,255,0.06)'}}, border:{{color:'rgba(255,255,255,0.08)'}} }}
+      }}
+    }}
+  }});
+
+  // 테이블: 최근 6개 날짜
+  var recentN = Math.min(6, KB_MONTHLY_DATES.length);
+  var recentIdxs = [];
+  for (var i = KB_MONTHLY_DATES.length - recentN; i < KB_MONTHLY_DATES.length; i++) recentIdxs.push(i);
+  document.getElementById('trendTableHead').innerHTML =
+    '<th style="text-align:left">지역</th>' +
+    recentIdxs.map(function(i){{ return '<th>'+KB_MONTHLY_DATES[i]+'</th>'; }}).join('');
+  document.getElementById('trendTableBody').innerHTML = regions.map(function(name) {{
+    var cells = recentIdxs.map(function(i) {{
+      var v = pyGetValue(name, i);
+      return '<td style="text-align:right">'+(v!==null?Math.round(v).toLocaleString():'-')+'</td>';
+    }}).join('');
+    return '<tr><td><strong>'+name+'</strong></td>'+cells+'</tr>';
+  }}).join('');
+}}
+
+function renderTrendChart() {{
+  if (!trendInitDone) {{
+    trendInitDone = true;
+    var lastIdx = KB_MONTHLY_DATES.length - 1;
+    var scored = Object.keys(KB_MONTHLY_REGIONS)
+      .filter(function(n){{ return !pyIsGroupedRegion(n); }})
+      .map(function(n){{ return {{name:n, val:pyGetValue(n,lastIdx)||0}}; }})
+      .sort(function(a,b){{ return b.val-a.val; }});
+    scored.slice(0,5).forEach(function(s){{ trendSelectedSet.add(s.name); }});
+    trendRenderChips();
+  }}
+  trendDraw();
+}}
+
+// ── 탭3(구 탭2): 분위가격 차트 ──
+var qtlChartInstance = null;
+function renderQtlChart() {{
+  if (!QTL_STATS || QTL_STATS.length === 0) {{
+    document.getElementById('panel1').querySelector('.chart-wrap').innerHTML =
+      '<div class="no-data">📭 분위가격 데이터가 없습니다.<br><small>거래 데이터 갱신 후 다시 생성해주세요.</small></div>';
+    return;
+  }}
+  var labels = QTL_STATS.map(function(d){{return d.sigungu;}});
+  if (qtlChartInstance) {{ qtlChartInstance.destroy(); qtlChartInstance = null; }}
+  qtlChartInstance = new Chart(document.getElementById('qtlChart').getContext('2d'), {{
+    type: 'bar',
+    data: {{
+      labels: labels,
+      datasets: [
+        {{
+          label: 'Q1 (하위25%)',
+          data: QTL_STATS.map(function(d){{return d.q1;}}),
+          backgroundColor: 'rgba(33,150,243,0.7)',
+          borderRadius: 3, borderWidth: 0
+        }},
+        {{
+          label: '중위 (50%)',
+          data: QTL_STATS.map(function(d){{return d.med;}}),
+          backgroundColor: 'rgba(76,175,80,0.8)',
+          borderRadius: 3, borderWidth: 0
+        }},
+        {{
+          label: 'Q3 (상위25%)',
+          data: QTL_STATS.map(function(d){{return d.q3;}}),
+          backgroundColor: 'rgba(255,152,0,0.8)',
+          borderRadius: 3, borderWidth: 0
+        }},
+        {{
+          label: '최고가',
+          data: QTL_STATS.map(function(d){{return d.max;}}),
+          backgroundColor: 'rgba(244,67,54,0.75)',
+          borderRadius: 3, borderWidth: 0
+        }}
+      ]
+    }},
+    options: {{
+      indexAxis: 'y',
+      responsive: true,
+      animation: {{duration: 400}},
+      plugins: {{
+        legend: {{
+          display: true,
+          labels: {{color:'rgba(255,255,255,0.75)', boxWidth:14, font:{{size:12}}}}
+        }},
+        tooltip: {{callbacks: {{
+          label: function(c) {{ return ' ' + c.dataset.label + ': ' + Math.round(c.parsed.x).toLocaleString() + ' 만원'; }}
+        }}}}
+      }},
+      scales: {{
+        x: {{
+          ticks: {{color:'rgba(255,255,255,0.6)', callback: function(v){{return (v/10000).toFixed(1)+'억';}}}},
+          grid: {{color:'rgba(255,255,255,0.07)'}}
+        }},
+        y: {{ticks: {{color:'rgba(255,255,255,0.85)', font:{{size:12}}}}, grid: {{display:false}}}}
+      }}
+    }}
+  }});
+  // 테이블
+  function fmtW(v) {{ return Math.round(v).toLocaleString() + '만'; }}
+  document.getElementById('qtlTableBody').innerHTML = QTL_STATS.map(function(d, i) {{
+    return '<tr><td>'+(i+1)+'</td><td>'+d.sigungu+'</td>'
+      +'<td>'+fmtW(d.q1)+'</td><td><strong>'+fmtW(d.med)+'</strong></td>'
+      +'<td>'+fmtW(d.q3)+'</td><td style="color:#f44336">'+fmtW(d.max)+'</td>'
+      +'<td>'+d.count+'건</td></tr>';
+  }}).join('');
+}}
+
+// ── KB 연간 차트 모달 ──
+var regionChartInstance = null, currentChartRegion = '', currentChartTab = 'weekly';
+function aggregateWeekly(d){{var s=d.slice(-52);return[s.map(function(x){{return x[0];}}),s.map(function(x){{return x[1];}})];}}
+function aggregateMonthly(d){{
+  var map={{}},keys=[];
+  d.forEach(function(x){{var m=x[0].substring(0,7);if(!map[m]){{map[m]=0;keys.push(m);}}map[m]+=x[1];}});
+  keys.sort();return[keys,keys.map(function(k){{return Math.round(map[k]*100)/100;}})];
+}}
+function aggregateYearly(d){{
+  var map={{}},keys=[];
+  d.forEach(function(x){{var y=x[0].substring(0,4);if(!map[y]){{map[y]=0;keys.push(y);}}map[y]+=x[1];}});
+  keys.sort();return[keys,keys.map(function(k){{return Math.round(map[k]*100)/100;}})];
+}}
+function renderRegionChart(regionName, tab) {{
+  var raw = KB_ANNUAL_DATA[regionName];
+  if (!raw||raw.length===0) return;
+  var r = tab==='monthly' ? aggregateMonthly(raw) : tab==='yearly' ? aggregateYearly(raw) : aggregateWeekly(raw);
+  var labels=r[0], values=r[1];
+  var tabLabels={{weekly:'주간 (최근 52주)',monthly:'월간 누적',yearly:'연간 누적'}};
+  document.getElementById('chartModalTitle').textContent = '📊 ' + regionName;
+  document.getElementById('chartModalSubtitle').textContent = tabLabels[tab] + ' KB 매매증감 | 총 ' + labels.length + '개 항목';
+  if (regionChartInstance) {{regionChartInstance.destroy(); regionChartInstance=null;}}
+  var bgC=values.map(function(v){{return v>=0?'rgba(244,67,54,0.72)':'rgba(52,152,219,0.72)';}});
+  var bdC=values.map(function(v){{return v>=0?'#f44336':'#3498db';}});
+  regionChartInstance = new Chart(document.getElementById('regionChart').getContext('2d'), {{
+    type:'bar',
+    data:{{labels:labels,datasets:[{{label:'증감(%)',data:values,backgroundColor:bgC,borderColor:bdC,borderWidth:1,borderRadius:3}}]}},
+    options:{{
+      responsive:true, animation:{{duration:350}},
+      plugins:{{legend:{{display:false}},tooltip:{{callbacks:{{label:function(c){{return (c.parsed.y>=0?'+':'')+c.parsed.y.toFixed(2)+'%';}}}}}}}},
+      scales:{{
+        x:{{ticks:{{color:'rgba(255,255,255,0.55)',maxRotation:tab==='weekly'?60:45,font:{{size:tab==='yearly'?13:10}},maxTicksLimit:tab==='yearly'?20:(tab==='monthly'?24:26)}},grid:{{color:'rgba(255,255,255,0.07)'}}}},
+        y:{{ticks:{{color:'rgba(255,255,255,0.65)',callback:function(v){{return (v>=0?'+':'')+v.toFixed(2)+'%';}}}},grid:{{color:'rgba(255,255,255,0.1)'}}}}
+      }}
+    }}
+  }});
+}}
+function showRegionChart(regionName) {{
+  if (!KB_ANNUAL_DATA[regionName]||KB_ANNUAL_DATA[regionName].length===0){{alert(regionName+'의 데이터가 없습니다.');return;}}
+  currentChartRegion=regionName; switchChartTab('weekly');
+  document.getElementById('chartModal').classList.add('show');
+}}
+function switchChartTab(tab) {{
+  currentChartTab=tab;
+  document.querySelectorAll('.chart-tab-btn').forEach(function(btn){{btn.classList.toggle('active',btn.dataset.tab===tab);}});
+  renderRegionChart(currentChartRegion, tab);
+}}
+function closeChartModal() {{document.getElementById('chartModal').classList.remove('show');}}
+
+// 페이지 로드 시 탭0 초기화
+document.addEventListener('DOMContentLoaded', function() {{
+  renderPyChart();
+  renderQtlChart();
+}});
+</script>
+</body>
+</html>"""
+        return html_content
+
+    def export_kb_html(self, kb_analysis, *, silent=False):
+        """KB부동산 데이터 HTML 저장 (newtrade/KB부동산데이터.html)"""
+        if not kb_analysis:
+            return None
+        try:
+            html_str = self.build_kb_html(kb_analysis)
+            if not html_str:
+                return None
+            newtrade_dir = os.path.join(self.html_download_path, "newtrade")
+            os.makedirs(newtrade_dir, exist_ok=True)
+            filepath = os.path.join(newtrade_dir, "KB부동산데이터.html")
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(html_str)
+            logging.info(f"[KB HTML] 저장: {filepath}")
+            if not silent:
+                messagebox.showinfo("저장 완료", f"KB부동산 데이터 HTML 저장: {filepath}")
+            return filepath
+        except Exception as e:
+            logging.error(f"KB HTML 저장 중 오류: {str(e)}")
+            if not silent:
+                messagebox.showerror("오류", f"KB HTML 저장 실패: {str(e)}")
+            return None
+
+    def export_kb_html_btn(self):
+        """🏦 KB 데이터 HTML 버튼 핸들러 — KB부동산데이터.html 단독 생성"""
+        try:
+            kb_analysis = self.analyze_kb_excel()
+            if not kb_analysis:
+                messagebox.showwarning("알림", "KB 분석 데이터가 없습니다.\n먼저 '데이터 갱신'을 실행해주세요.")
+                return
+            filepath = self.export_kb_html(kb_analysis, silent=True)
+            if filepath:
+                try:
+                    open_file_or_folder(filepath)
+                except Exception:
+                    pass
+                messagebox.showinfo("저장 완료", f"KB부동산 데이터 HTML 저장:\n{filepath}")
+        except Exception as e:
+            logging.error(f"KB 데이터 HTML 생성 오류: {e}")
+            messagebox.showerror("오류", f"KB HTML 생성 실패: {e}")
+
     def export_fear_greed_html(self):
         """부동산 최신 근황 HTML 내보내기 (newtrade/index.html)"""
         try:
@@ -12072,6 +14452,8 @@ function closeChartModal() {
             filepath = os.path.join(newtrade_dir, "index.html")
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(html_str)
+            # KB부동산 데이터 HTML도 함께 저장
+            self.export_kb_html(kb_analysis, silent=True)
             return filepath
         except Exception as e:
             logging.error(f"[일괄 부동산근황] {list_name} 오류: {e}")

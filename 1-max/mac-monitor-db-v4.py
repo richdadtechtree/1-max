@@ -13197,17 +13197,27 @@ header.main-header{{
       <!-- 컨트롤 바 -->
       <div class="chart-wrap" style="padding-bottom:16px;">
         <div class="chart-wrap-title" style="margin-bottom:14px;">📈 시군구별 분위가격 (만원) — 최근 6개월 실거래 기준</div>
+        <div class="py-ctrl-row" style="margin-bottom:10px;">
+          <div class="py-ctrl-left" style="align-items:center;">
+            <select id="qtlSiDo" class="py-search-input" style="width:160px;" onchange="qtlOnSiDoChange()">
+              <option value="">전체 시/도</option>
+            </select>
+            <select id="qtlGu" class="py-search-input" style="width:160px;" onchange="qtlOnGuChange()">
+              <option value="">전체 구</option>
+            </select>
+          </div>
+          <div class="py-ctrl-right">
+            <input type="text" id="qtlSearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="qtlFilterChips()" />
+          </div>
+        </div>
         <div class="py-ctrl-row">
           <div class="py-ctrl-left">
             <button class="py-preset-btn active" id="qtlPresetTop15" onclick="qtlPreset(event,'top15')">TOP 15</button>
             <button class="py-preset-btn" id="qtlPresetAll"  onclick="qtlPreset(event,'all')">전체</button>
             <button class="py-preset-btn" id="qtlPresetNone" onclick="qtlPreset(event,'none')">전체 해제</button>
           </div>
-          <div class="py-ctrl-right">
-            <input type="text" id="qtlSearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="qtlFilterChips()" />
-          </div>
         </div>
-        <div id="qtlChipArea" class="py-chip-area" style="max-height:100px;"></div>
+        <div id="qtlChipArea" class="py-chip-area" style="max-height:100px;margin-top:10px;"></div>
         <div style="margin-top:6px;font-size:12px;color:var(--muted);">
           <span id="qtlSelCount">0</span>개 선택됨
         </div>
@@ -14093,17 +14103,93 @@ function renderTrendChart() {{
 var qtlChartInstance = null;
 var qtlSelectedSet   = new Set();
 var qtlInitDone      = false;
+// sigungu → 시/도 매핑 (드롭다운용)
+var qtlSiDoMap = {{}};  // sigungu → sido
+var qtlGuMap   = {{}};  // sigungu → gu (구/군/시)
+
+function qtlBuildGeoMap() {{
+  // sigungu 값 예: "강남구", "수원시 영통구", "성남시 분당구", "부산 해운대구" 등
+  // 첫 토큰이 시/도, 두번째 토큰이 구/군/시 (단독 구 이름이면 서울로 간주)
+  var sidoSet = {{}};
+  QTL_STATS.forEach(function(d) {{
+    var parts = d.sigungu.trim().split(/\s+/);
+    var sido, gu;
+    if (parts.length >= 2) {{
+      sido = parts[0]; gu = parts.slice(1).join(' ');
+    }} else {{
+      // 단독 구/동 이름 → 뒤에 "구"가 있으면 서울로, 없으면 기타
+      sido = /구$/.test(parts[0]) ? '서울' : '기타';
+      gu   = parts[0];
+    }}
+    qtlSiDoMap[d.sigungu] = sido;
+    qtlGuMap[d.sigungu]   = gu;
+    sidoSet[sido] = true;
+  }});
+
+  // 시/도 드롭다운 채우기
+  var sidoSel = document.getElementById('qtlSiDo');
+  sidoSel.innerHTML = '<option value="">전체 시/도</option>';
+  Object.keys(sidoSet).sort().forEach(function(sido) {{
+    var opt = document.createElement('option');
+    opt.value = sido; opt.textContent = sido;
+    sidoSel.appendChild(opt);
+  }});
+}}
+
+function qtlOnSiDoChange() {{
+  var sido = document.getElementById('qtlSiDo').value;
+  // 구 드롭다운 업데이트
+  var guSel = document.getElementById('qtlGu');
+  guSel.innerHTML = '<option value="">전체 구</option>';
+  var guSet = {{}};
+  QTL_STATS.forEach(function(d) {{
+    if (!sido || qtlSiDoMap[d.sigungu] === sido) guSet[qtlGuMap[d.sigungu]] = true;
+  }});
+  Object.keys(guSet).sort().forEach(function(gu) {{
+    var opt = document.createElement('option');
+    opt.value = gu; opt.textContent = gu;
+    guSel.appendChild(opt);
+  }});
+  guSel.value = '';
+  // 해당 시/도 전체 선택
+  qtlSelectedSet.clear();
+  QTL_STATS.forEach(function(d) {{
+    if (!sido || qtlSiDoMap[d.sigungu] === sido) qtlSelectedSet.add(d.sigungu);
+  }});
+  qtlRenderChips();
+  qtlDrawChart();
+}}
+
+function qtlOnGuChange() {{
+  var sido = document.getElementById('qtlSiDo').value;
+  var gu   = document.getElementById('qtlGu').value;
+  qtlSelectedSet.clear();
+  QTL_STATS.forEach(function(d) {{
+    var matchSido = !sido || qtlSiDoMap[d.sigungu] === sido;
+    var matchGu   = !gu   || qtlGuMap[d.sigungu]   === gu;
+    if (matchSido && matchGu) qtlSelectedSet.add(d.sigungu);
+  }});
+  qtlRenderChips();
+  qtlDrawChart();
+}}
 
 function qtlPreset(e, type) {{
   document.querySelectorAll('.py-preset-btn[id^="qtlPreset"]').forEach(function(b){{ b.classList.remove('active'); }});
   e.currentTarget.classList.add('active');
+  // 프리셋은 현재 시/도·구 필터 범위 안에서 적용
+  var sido = document.getElementById('qtlSiDo').value;
+  var gu   = document.getElementById('qtlGu').value;
+  var pool = QTL_STATS.filter(function(d) {{
+    var matchSido = !sido || qtlSiDoMap[d.sigungu] === sido;
+    var matchGu   = !gu   || qtlGuMap[d.sigungu]   === gu;
+    return matchSido && matchGu;
+  }});
   qtlSelectedSet.clear();
   if (type === 'top15') {{
-    // 중위가격 기준 상위 15개
-    QTL_STATS.slice().sort(function(a,b){{return b.med-a.med;}}).slice(0,15)
+    pool.slice().sort(function(a,b){{return b.med-a.med;}}).slice(0,15)
       .forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
   }} else if (type === 'all') {{
-    QTL_STATS.forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
+    pool.forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
   }}
   qtlRenderChips();
   qtlDrawChart();
@@ -14120,7 +14206,15 @@ function qtlRenderChips() {{
   var area = document.getElementById('qtlChipArea');
   if (!area) return;
   area.innerHTML = '';
-  QTL_STATS.forEach(function(d) {{
+  // 현재 시/도·구 필터 기준으로 칩 목록 표시
+  var sido = document.getElementById('qtlSiDo').value;
+  var gu   = document.getElementById('qtlGu').value;
+  var pool = QTL_STATS.filter(function(d) {{
+    var matchSido = !sido || qtlSiDoMap[d.sigungu] === sido;
+    var matchGu   = !gu   || qtlGuMap[d.sigungu]   === gu;
+    return matchSido && matchGu;
+  }});
+  pool.forEach(function(d) {{
     var chip = document.createElement('span');
     chip.className = 'py-chip' + (qtlSelectedSet.has(d.sigungu) ? ' selected' : '');
     chip.textContent = d.sigungu;
@@ -14209,6 +14303,7 @@ function renderQtlChart() {{
   }}
   if (!qtlInitDone) {{
     qtlInitDone = true;
+    qtlBuildGeoMap();
     // 초기: 중위가격 기준 상위 15개
     QTL_STATS.slice().sort(function(a,b){{return b.med-a.med;}}).slice(0,15)
       .forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});

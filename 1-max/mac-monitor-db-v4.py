@@ -13193,9 +13193,28 @@ header.main-header{{
   <!-- ── 탭 패널 1: 지역별 분위가격 ── -->
   <div class="tab-panel" id="panel1">
     <div class="chart-section">
-      <div class="chart-wrap">
-        <div class="chart-wrap-title">📈 시군구별 분위가격 (만원) — 최근 6개월 실거래 기준</div>
-        <canvas id="qtlChart" style="max-height:480px;"></canvas>
+
+      <!-- 컨트롤 바 -->
+      <div class="chart-wrap" style="padding-bottom:16px;">
+        <div class="chart-wrap-title" style="margin-bottom:14px;">📈 시군구별 분위가격 (만원) — 최근 6개월 실거래 기준</div>
+        <div class="py-ctrl-row">
+          <div class="py-ctrl-left">
+            <button class="py-preset-btn active" id="qtlPresetTop15" onclick="qtlPreset(event,'top15')">TOP 15</button>
+            <button class="py-preset-btn" id="qtlPresetAll"  onclick="qtlPreset(event,'all')">전체</button>
+            <button class="py-preset-btn" id="qtlPresetNone" onclick="qtlPreset(event,'none')">전체 해제</button>
+          </div>
+          <div class="py-ctrl-right">
+            <input type="text" id="qtlSearch" placeholder="🔍 지역 검색..." class="py-search-input" oninput="qtlFilterChips()" />
+          </div>
+        </div>
+        <div id="qtlChipArea" class="py-chip-area" style="max-height:100px;"></div>
+        <div style="margin-top:6px;font-size:12px;color:var(--muted);">
+          <span id="qtlSelCount">0</span>개 선택됨
+        </div>
+      </div>
+
+      <div class="chart-wrap" id="qtlChartWrap">
+        <canvas id="qtlChart" style="max-height:600px;"></canvas>
       </div>
       <div class="table-section">
         <div class="table-header">
@@ -14070,77 +14089,132 @@ function renderTrendChart() {{
   trendDraw();
 }}
 
-// ── 탭3(구 탭2): 분위가격 차트 ──
+// ── 탭1: 분위가격 차트 ──
 var qtlChartInstance = null;
-function renderQtlChart() {{
-  if (!QTL_STATS || QTL_STATS.length === 0) {{
-    document.getElementById('panel1').querySelector('.chart-wrap').innerHTML =
-      '<div class="no-data">📭 분위가격 데이터가 없습니다.<br><small>거래 데이터 갱신 후 다시 생성해주세요.</small></div>';
+var qtlSelectedSet   = new Set();
+var qtlInitDone      = false;
+
+function qtlPreset(e, type) {{
+  document.querySelectorAll('.py-preset-btn[id^="qtlPreset"]').forEach(function(b){{ b.classList.remove('active'); }});
+  e.currentTarget.classList.add('active');
+  qtlSelectedSet.clear();
+  if (type === 'top15') {{
+    // 중위가격 기준 상위 15개
+    QTL_STATS.slice().sort(function(a,b){{return b.med-a.med;}}).slice(0,15)
+      .forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
+  }} else if (type === 'all') {{
+    QTL_STATS.forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
+  }}
+  qtlRenderChips();
+  qtlDrawChart();
+}}
+
+function qtlFilterChips() {{
+  var q = (document.getElementById('qtlSearch').value || '').trim().toLowerCase();
+  document.querySelectorAll('#qtlChipArea .py-chip').forEach(function(chip) {{
+    chip.classList.toggle('hidden', !!(q && !chip.textContent.toLowerCase().includes(q)));
+  }});
+}}
+
+function qtlRenderChips() {{
+  var area = document.getElementById('qtlChipArea');
+  if (!area) return;
+  area.innerHTML = '';
+  QTL_STATS.forEach(function(d) {{
+    var chip = document.createElement('span');
+    chip.className = 'py-chip' + (qtlSelectedSet.has(d.sigungu) ? ' selected' : '');
+    chip.textContent = d.sigungu;
+    chip.addEventListener('click', function() {{
+      if (qtlSelectedSet.has(d.sigungu)) {{ qtlSelectedSet.delete(d.sigungu); chip.classList.remove('selected'); }}
+      else {{ qtlSelectedSet.add(d.sigungu); chip.classList.add('selected'); }}
+      qtlUpdateSelCount();
+      qtlDrawChart();
+    }});
+    area.appendChild(chip);
+  }});
+  qtlUpdateSelCount();
+}}
+
+function qtlUpdateSelCount() {{
+  var el = document.getElementById('qtlSelCount');
+  if (el) el.textContent = qtlSelectedSet.size;
+}}
+
+function qtlDrawChart() {{
+  var filtered = QTL_STATS.filter(function(d){{ return qtlSelectedSet.has(d.sigungu); }});
+  var canvas = document.getElementById('qtlChart');
+
+  if (filtered.length === 0) {{
+    if (qtlChartInstance) {{ qtlChartInstance.destroy(); qtlChartInstance = null; }}
+    canvas.style.display = 'none';
+    document.getElementById('qtlTableBody').innerHTML = '';
     return;
   }}
-  var labels = QTL_STATS.map(function(d){{return d.sigungu;}});
+  canvas.style.display = '';
+
+  var canvasH = Math.max(320, Math.min(filtered.length * 40 + 60, 700));
+  document.getElementById('qtlChartWrap').style.height = canvasH + 'px';
+  canvas.style.maxHeight = 'none';
+
+  var labels = filtered.map(function(d){{return d.sigungu;}});
   if (qtlChartInstance) {{ qtlChartInstance.destroy(); qtlChartInstance = null; }}
-  qtlChartInstance = new Chart(document.getElementById('qtlChart').getContext('2d'), {{
+  qtlChartInstance = new Chart(canvas.getContext('2d'), {{
     type: 'bar',
     data: {{
       labels: labels,
       datasets: [
-        {{
-          label: 'Q1 (하위25%)',
-          data: QTL_STATS.map(function(d){{return d.q1;}}),
-          backgroundColor: 'rgba(33,150,243,0.7)',
-          borderRadius: 3, borderWidth: 0
-        }},
-        {{
-          label: '중위 (50%)',
-          data: QTL_STATS.map(function(d){{return d.med;}}),
-          backgroundColor: 'rgba(76,175,80,0.8)',
-          borderRadius: 3, borderWidth: 0
-        }},
-        {{
-          label: 'Q3 (상위25%)',
-          data: QTL_STATS.map(function(d){{return d.q3;}}),
-          backgroundColor: 'rgba(255,152,0,0.8)',
-          borderRadius: 3, borderWidth: 0
-        }},
-        {{
-          label: '최고가',
-          data: QTL_STATS.map(function(d){{return d.max;}}),
-          backgroundColor: 'rgba(244,67,54,0.75)',
-          borderRadius: 3, borderWidth: 0
-        }}
+        {{ label:'Q1 (하위25%)', data:filtered.map(function(d){{return d.q1;}}),
+           backgroundColor:'rgba(33,150,243,0.7)', borderRadius:3, borderWidth:0 }},
+        {{ label:'중위 (50%)',   data:filtered.map(function(d){{return d.med;}}),
+           backgroundColor:'rgba(76,175,80,0.8)',  borderRadius:3, borderWidth:0 }},
+        {{ label:'Q3 (상위25%)', data:filtered.map(function(d){{return d.q3;}}),
+           backgroundColor:'rgba(255,152,0,0.8)',  borderRadius:3, borderWidth:0 }},
+        {{ label:'최고가',       data:filtered.map(function(d){{return d.max;}}),
+           backgroundColor:'rgba(244,67,54,0.75)', borderRadius:3, borderWidth:0 }}
       ]
     }},
     options: {{
       indexAxis: 'y',
       responsive: true,
+      maintainAspectRatio: false,
       animation: {{duration: 400}},
       plugins: {{
-        legend: {{
-          display: true,
-          labels: {{color:'rgba(255,255,255,0.75)', boxWidth:14, font:{{size:12}}}}
-        }},
-        tooltip: {{callbacks: {{
-          label: function(c) {{ return ' ' + c.dataset.label + ': ' + Math.round(c.parsed.x).toLocaleString() + ' 만원'; }}
-        }}}}
+        legend: {{ display:true, labels:{{color:'rgba(255,255,255,0.75)',boxWidth:14,font:{{size:12}}}} }},
+        tooltip: {{ callbacks: {{ label: function(c) {{
+          return ' ' + c.dataset.label + ': ' + Math.round(c.parsed.x).toLocaleString() + ' 만원';
+        }} }} }}
       }},
       scales: {{
-        x: {{
-          ticks: {{color:'rgba(255,255,255,0.6)', callback: function(v){{return (v/10000).toFixed(1)+'억';}}}},
-          grid: {{color:'rgba(255,255,255,0.07)'}}
-        }},
-        y: {{ticks: {{color:'rgba(255,255,255,0.85)', font:{{size:12}}}}, grid: {{display:false}}}}
+        x: {{ ticks:{{color:'rgba(255,255,255,0.6)',callback:function(v){{return (v/10000).toFixed(1)+'억';}}}},
+              grid:{{color:'rgba(255,255,255,0.07)'}} }},
+        y: {{ ticks:{{color:'rgba(255,255,255,0.85)',font:{{size:12}}}}, grid:{{display:false}} }}
       }}
     }}
   }});
-  // 테이블
+
   function fmtW(v) {{ return Math.round(v).toLocaleString() + '만'; }}
-  document.getElementById('qtlTableBody').innerHTML = QTL_STATS.map(function(d, i) {{
+  document.getElementById('qtlTableBody').innerHTML = filtered.map(function(d, i) {{
     return '<tr><td>'+(i+1)+'</td><td>'+d.sigungu+'</td>'
       +'<td>'+fmtW(d.q1)+'</td><td><strong>'+fmtW(d.med)+'</strong></td>'
       +'<td>'+fmtW(d.q3)+'</td><td style="color:#f44336">'+fmtW(d.max)+'</td>'
       +'<td>'+d.count+'건</td></tr>';
   }}).join('');
+}}
+
+function renderQtlChart() {{
+  if (!QTL_STATS || QTL_STATS.length === 0) {{
+    document.getElementById('panel1').querySelector('#qtlChartWrap').innerHTML =
+      '<div class="no-data">📭 분위가격 데이터가 없습니다.<br><small>거래 데이터 갱신 후 다시 생성해주세요.</small></div>';
+    return;
+  }}
+  if (!qtlInitDone) {{
+    qtlInitDone = true;
+    // 초기: 중위가격 기준 상위 15개
+    QTL_STATS.slice().sort(function(a,b){{return b.med-a.med;}}).slice(0,15)
+      .forEach(function(d){{ qtlSelectedSet.add(d.sigungu); }});
+    qtlRenderChips();
+  }}
+  qtlDrawChart();
 }}
 
 // ── KB 연간 차트 모달 ──

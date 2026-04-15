@@ -9780,6 +9780,88 @@ if (isMulti) {{
           }}
 
           footer{{ margin:24px 0 0; color:#6b7280; font-size:12px; text-align:center }}
+
+          /* ── 시/도·구 2단계 필터 ── */
+          .gu-filter-bar{{
+            max-width:960px; width:92vw; margin:12px auto 0;
+            display:flex; align-items:flex-start; gap:8px; flex-wrap:wrap;
+          }}
+          /* 시/도 버튼 그룹 */
+          .sido-btn-group{{
+            display:flex; flex-wrap:wrap; gap:6px; align-items:center;
+          }}
+          .sido-btn{{
+            padding:8px 14px; border-radius:999px; font-size:13px; font-weight:600;
+            border:1px solid var(--bd); background:var(--card); color:var(--sub);
+            cursor:pointer; white-space:nowrap; transition:all .18s;
+            box-shadow:0 1px 4px rgba(0,0,0,.04);
+          }}
+          .sido-btn:hover{{ border-color:var(--primary); color:var(--primary); }}
+          .sido-btn.active{{
+            background:var(--primary); border-color:var(--primary);
+            color:#fff; box-shadow:0 2px 8px rgba(0,122,255,.3);
+          }}
+          /* 구 드롭다운 */
+          .gu-dropdown-wrap{{ position:relative; }}
+          .gu-dropdown-btn{{
+            display:inline-flex; align-items:center; gap:6px;
+            padding:8px 16px; border-radius:12px;
+            border:1px solid var(--bd); background:var(--card); color:var(--fg);
+            font-size:14px; font-family:inherit; cursor:pointer;
+            box-shadow:0 2px 8px rgba(0,0,0,.05); transition:all .2s;
+            white-space:nowrap;
+          }}
+          .gu-dropdown-btn:hover{{ border-color:var(--primary); }}
+          .gu-dropdown-btn.has-selection{{ border-color:var(--primary); color:var(--primary); font-weight:600; }}
+          .gu-dropdown-btn:disabled{{ opacity:.4; cursor:not-allowed; }}
+          .gu-dropdown-arrow{{ font-size:10px; transition:transform .2s; }}
+          .gu-dropdown-arrow.open{{ transform:rotate(180deg); }}
+          .gu-dropdown-panel{{
+            display:none; position:absolute; top:calc(100% + 6px); left:0; z-index:200;
+            background:var(--card); border:1px solid var(--bd); border-radius:12px;
+            box-shadow:0 8px 24px rgba(0,0,0,.12);
+            min-width:220px; max-height:320px; overflow-y:auto;
+            padding:8px 0;
+          }}
+          .gu-dropdown-panel.open{{ display:block; }}
+          .gu-dropdown-header{{
+            display:flex; justify-content:space-between; align-items:center;
+            padding:6px 14px 8px; border-bottom:1px solid var(--bd); margin-bottom:4px;
+            position:sticky; top:0; background:var(--card); z-index:1;
+          }}
+          .gu-dropdown-header span{{ font-size:12px; color:var(--sub); }}
+          .gu-dropdown-header button{{
+            font-size:12px; border:none; background:none; color:var(--primary);
+            cursor:pointer; font-weight:600; padding:0;
+          }}
+          .gu-option{{
+            display:flex; align-items:center; gap:8px;
+            padding:8px 14px; cursor:pointer; font-size:14px;
+            transition:background .15s;
+          }}
+          .gu-option:hover{{ background:#f3f4f6; }}
+          .gu-option input[type=checkbox]{{ accent-color:var(--primary); width:15px; height:15px; cursor:pointer; }}
+          .gu-option label{{ cursor:pointer; flex:1; }}
+          /* 선택 태그 */
+          .gu-selected-tags{{
+            display:flex; flex-wrap:wrap; gap:6px; flex:1; align-items:center;
+          }}
+          .gu-tag{{
+            display:inline-flex; align-items:center; gap:4px;
+            padding:4px 10px; border-radius:999px; font-size:12px; font-weight:600;
+            background:var(--primary); color:#fff;
+          }}
+          .gu-tag-remove{{
+            border:none; background:none; color:#fff; font-size:13px;
+            cursor:pointer; line-height:1; padding:0; opacity:.8;
+          }}
+          .gu-tag-remove:hover{{ opacity:1; }}
+          .gu-clear-btn{{
+            padding:6px 12px; border-radius:8px; border:1px solid var(--bd);
+            background:none; color:var(--sub); font-size:12px; cursor:pointer;
+            white-space:nowrap; transition:all .15s;
+          }}
+          .gu-clear-btn:hover{{ border-color:var(--accent); color:var(--accent); }}
         </style>
         </head>
         <body>
@@ -9798,6 +9880,31 @@ if (isMulti) {{
                 <button class="price-btn" data-range="30s">30억대</button>
               </div>
             </header>
+
+            <!-- 시/도 · 구 2단계 필터 -->
+            <div class="gu-filter-bar">
+              <!-- Step 1: 시/도 버튼 -->
+              <div class="sido-btn-group" id="sidoBtnGroup">
+                <!-- JS에서 동적 생성 -->
+              </div>
+            </div>
+            <div class="gu-filter-bar" style="margin-top:8px;">
+              <!-- Step 2: 구 드롭다운 -->
+              <div class="gu-dropdown-wrap">
+                <button class="gu-dropdown-btn" id="guDropdownBtn" onclick="toggleGuDropdown()" disabled>
+                  🏙️ 구 선택 <span class="gu-dropdown-arrow" id="guDropdownArrow">▼</span>
+                </button>
+                <div class="gu-dropdown-panel" id="guDropdownPanel">
+                  <div class="gu-dropdown-header">
+                    <span id="guOptionCount">0개</span>
+                    <button onclick="guSelectAll()">전체선택</button>
+                  </div>
+                  <div id="guOptionList"></div>
+                </div>
+              </div>
+              <div class="gu-selected-tags" id="guSelectedTags"></div>
+              <button class="gu-clear-btn" id="guClearBtn" style="display:none;" onclick="guClearAll()">구 선택 초기화</button>
+            </div>
 
             <!-- 검색 바 -->
             <div class="search-bar">
@@ -9968,7 +10075,7 @@ if (isMulti) {{
           const dongStr = dong && dong !== '-' ? dong : '';
 
           return `
-            <div class="card" data-price-range="${{priceRange}}" data-kakao-query="${{kakaoQuery}}" onclick="openKakaoMap(this)" style="cursor:pointer;">
+            <div class="card" data-price-range="${{priceRange}}" data-sigungu="${{sigunguRaw}}" data-kakao-query="${{kakaoQuery}}" onclick="openKakaoMap(this)" style="cursor:pointer;">
               <div class="card-header">
                 <h3>🏆 ${{rank}}위 ${{rankBadge}} ${{aptName}} ${{yearBadge}} 전용면적 ${{areaDisplay}}</h3>
                 ${{regulationBadges ? `<div class="regulation-badges">${{regulationBadges}}</div>` : ''}}
@@ -10002,6 +10109,179 @@ if (isMulti) {{
         let currentRange = 'all';
         let searchQuery = '';
         let isRenderingComplete = false;
+        let selectedSigungus = new Set();  // 선택된 구 목록
+        let currentSido = '';              // 현재 선택된 시/도
+        let _sidoSigunguMap = {{}};         // 정규화 sido → Set<sigungu>
+
+        // sido 원본 문자열 → 표시명 변환
+        function normalizeSido(raw) {{
+          if (!raw) return '기타';
+          if (raw.includes('서울')) return '서울';
+          if (raw.includes('경기')) return '경기';
+          if (raw.includes('인천')) return '인천';
+          if (raw.includes('부산')) return '부산';
+          if (raw.includes('대구')) return '대구';
+          if (raw.includes('광주')) return '광주';
+          if (raw.includes('대전')) return '대전';
+          if (raw.includes('울산')) return '울산';
+          if (raw.includes('세종')) return '세종';
+          if (raw.includes('강원')) return '강원';
+          if (raw.includes('충북') || raw.includes('충청북')) return '충북';
+          if (raw.includes('충남') || raw.includes('충청남')) return '충남';
+          if (raw.includes('전북') || raw.includes('전라북')) return '전북';
+          if (raw.includes('전남') || raw.includes('전라남')) return '전남';
+          if (raw.includes('경북') || raw.includes('경상북')) return '경북';
+          if (raw.includes('경남') || raw.includes('경상남')) return '경남';
+          if (raw.includes('제주')) return '제주';
+          return raw;
+        }}
+
+        // ── 시/도 버튼 그룹 + 시도→구 맵 빌드 ──
+        function buildSigunguDropdown() {{
+          // apt[13]=sido, apt[1]=sigungu_idx 로 맵 구성
+          compressedApts.forEach(apt => {{
+            const sidoRaw = apt[13] || '';
+            const sg = apt[1] >= 0 ? sigungus[apt[1]] : '';
+            if (!sg) return;
+            const sido = normalizeSido(sidoRaw);
+            if (!_sidoSigunguMap[sido]) _sidoSigunguMap[sido] = new Set();
+            _sidoSigunguMap[sido].add(sg);
+          }});
+
+          // 시/도 버튼 생성
+          const group = document.getElementById('sidoBtnGroup');
+          if (!group) return;
+          group.innerHTML = '<span style="font-size:13px;color:var(--sub);white-space:nowrap;align-self:center;">🗺️ 시/도</span>';
+
+          // 고정 순서 + 데이터에 있는 것만
+          const ORDER = ['서울','경기','인천','부산','대구','광주','대전','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
+          const available = Object.keys(_sidoSigunguMap);
+          const sorted = ORDER.filter(s => available.includes(s))
+                          .concat(available.filter(s => !ORDER.includes(s)).sort((a,b) => a.localeCompare(b,'ko')));
+
+          sorted.forEach(sido => {{
+            const btn = document.createElement('button');
+            btn.className = 'sido-btn';
+            btn.textContent = sido;
+            btn.dataset.sido = sido;
+            btn.addEventListener('click', () => onSidoClick(sido, btn));
+            group.appendChild(btn);
+          }});
+        }}
+
+        // 시/도 버튼 클릭
+        function onSidoClick(sido, btn) {{
+          const isSame = currentSido === sido;
+          // 토글: 같은 버튼 다시 누르면 해제
+          currentSido = isSame ? '' : sido;
+
+          document.querySelectorAll('.sido-btn').forEach(b => b.classList.remove('active'));
+          if (!isSame) btn.classList.add('active');
+
+          // 구 선택 초기화
+          selectedSigungus.clear();
+          updateGuTags();
+
+          // 구 드롭다운 버튼 활성화/비활성화
+          const guBtn = document.getElementById('guDropdownBtn');
+          guBtn.disabled = !currentSido;
+
+          // 구 옵션 재구성
+          rebuildGuOptions();
+          if (isRenderingComplete) applyFilters();
+        }}
+
+        // 현재 시/도 기준으로 구 옵션 리스트 재구성
+        function rebuildGuOptions() {{
+          const pool = currentSido
+            ? [...(_sidoSigunguMap[currentSido] || new Set())].sort((a,b) => a.localeCompare(b,'ko'))
+            : [];
+
+          const list = document.getElementById('guOptionList');
+          const countEl = document.getElementById('guOptionCount');
+          if (!list) return;
+          list.innerHTML = '';
+          pool.forEach(sg => {{
+            const div = document.createElement('div');
+            div.className = 'gu-option';
+            const id = 'gu_' + sg.replace(/[\s()]/g,'_');
+            const checked = selectedSigungus.has(sg) ? 'checked' : '';
+            div.innerHTML = `<input type="checkbox" id="${{id}}" value="${{sg}}" ${{checked}}>
+                             <label for="${{id}}">${{sg}}</label>`;
+            div.querySelector('input').addEventListener('change', e => {{
+              if (e.target.checked) selectedSigungus.add(sg);
+              else selectedSigungus.delete(sg);
+              updateGuTags();
+              if (isRenderingComplete) applyFilters();
+            }});
+            list.appendChild(div);
+          }});
+          if (countEl) countEl.textContent = pool.length + '개';
+        }}
+
+        function toggleGuDropdown() {{
+          const btn = document.getElementById('guDropdownBtn');
+          if (btn.disabled) return;
+          const panel = document.getElementById('guDropdownPanel');
+          const arrow = document.getElementById('guDropdownArrow');
+          const isOpen = panel.classList.toggle('open');
+          arrow.classList.toggle('open', isOpen);
+          if (isOpen) {{
+            setTimeout(() => document.addEventListener('click', closeGuOnOutside), 0);
+          }}
+        }}
+
+        function closeGuOnOutside(e) {{
+          const wrap = document.querySelector('.gu-dropdown-wrap');
+          if (wrap && !wrap.contains(e.target)) {{
+            document.getElementById('guDropdownPanel').classList.remove('open');
+            document.getElementById('guDropdownArrow').classList.remove('open');
+            document.removeEventListener('click', closeGuOnOutside);
+          }}
+        }}
+
+        // 현재 표시된 구 전체 선택
+        function guSelectAll() {{
+          document.querySelectorAll('#guOptionList input[type=checkbox]').forEach(cb => {{
+            cb.checked = true;
+            selectedSigungus.add(cb.value);
+          }});
+          updateGuTags();
+          if (isRenderingComplete) applyFilters();
+        }}
+
+        // 구 선택 전체 해제 (시/도 선택은 유지)
+        function guClearAll() {{
+          selectedSigungus.clear();
+          document.querySelectorAll('#guOptionList input[type=checkbox]').forEach(cb => cb.checked = false);
+          updateGuTags();
+          if (isRenderingComplete) applyFilters();
+        }}
+
+        function updateGuTags() {{
+          const tagArea = document.getElementById('guSelectedTags');
+          const clearBtn = document.getElementById('guClearBtn');
+          const dropBtn  = document.getElementById('guDropdownBtn');
+          if (!tagArea) return;
+          tagArea.innerHTML = '';
+          selectedSigungus.forEach(sg => {{
+            const tag = document.createElement('span');
+            tag.className = 'gu-tag';
+            tag.innerHTML = `${{sg}} <button class="gu-tag-remove" onclick="guRemove('${{sg}}')" title="제거">✕</button>`;
+            tagArea.appendChild(tag);
+          }});
+          const hasSel = selectedSigungus.size > 0;
+          if (clearBtn) clearBtn.style.display = hasSel ? '' : 'none';
+          if (dropBtn)  dropBtn.classList.toggle('has-selection', hasSel);
+        }}
+
+        function guRemove(sg) {{
+          selectedSigungus.delete(sg);
+          const cb = document.querySelector(`#guOptionList input[value="${{sg}}"]`);
+          if (cb) cb.checked = false;
+          updateGuTags();
+          if (isRenderingComplete) applyFilters();
+        }}
 
         function renderChunk() {{
           const cardsContainer = document.getElementById('cards');
@@ -10038,6 +10318,7 @@ if (isMulti) {{
             // 렌더링 완료 - 로딩 인디케이터 숨기기
             if (loadingIndicator) loadingIndicator.style.display = 'none';
             isRenderingComplete = true;
+            buildSigunguDropdown();
             applyFilters();
             console.log('[평형별 순위] 렌더링 완료:', renderedCount, '개');
           }}
@@ -10049,6 +10330,7 @@ if (isMulti) {{
 
           cards.forEach(card => {{
             const priceMatch = currentRange === 'all' || card.dataset.priceRange === currentRange;
+            const guMatch = selectedSigungus.size === 0 || selectedSigungus.has(card.dataset.sigungu);
             let searchMatch = true;
             if (searchQuery) {{
               const cardHeader = card.querySelector('.card-header h3');
@@ -10056,7 +10338,7 @@ if (isMulti) {{
               searchMatch = cardText.includes(searchQuery.toLowerCase());
             }}
 
-            if (priceMatch && searchMatch) {{
+            if (priceMatch && guMatch && searchMatch) {{
               card.style.display = '';
               visibleCount++;
             }} else {{

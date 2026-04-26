@@ -16016,9 +16016,9 @@ document.addEventListener('DOMContentLoaded', function() {{
             </div>
           </div>
 
-          <!-- 가격대 4분류 요약 -->
+          <!-- 가격대 5분류 요약 -->
           <div class="price-category-section">
-            <h3>📋 가격대별 4분류 비율 비교</h3>
+            <h3>📋 가격대별 5분류 비율 비교</h3>
             <table class="price-cat-table">
               <thead>
                 <tr>
@@ -16358,7 +16358,7 @@ document.addEventListener('DOMContentLoaded', function() {{
 
             console.log('[가격대별 분위] 변화율: 기간1(' + period1Total + ') vs 기간2(' + period2Total + ') = ' + changeRate + '%');
 
-            // ===== 가격대 4분류 요약 테이블 업데이트 =====
+            // ===== 가격대 5분류 요약 테이블 업데이트 =====
             // 항상 과거 기간을 왼쪽, 최신 기간을 오른쪽에 배치
             const p1Start = new Date(document.getElementById('period1Start').value);
             const p2Start = new Date(document.getElementById('period2Start').value);
@@ -16485,24 +16485,26 @@ document.addEventListener('DOMContentLoaded', function() {{
             }}
           }}
 
-          // 가격대 4분류 요약 테이블 업데이트
+          // 가격대 5분류 요약 테이블 업데이트
           // oldData=과거 기간, newData=최신 기간 (호출 시 항상 과거→최신 순으로 전달됨)
           function updatePriceCategoryTable(oldData, newData, oldTotal, newTotal, oldLabel, newLabel) {{
             const categories = [
-              {{ label: '10억 이하', min: 0, max: 100000 }},
-              {{ label: '10~15억', min: 100001, max: 150000 }},
-              {{ label: '15~25억', min: 150001, max: 250000 }},
-              {{ label: '25억 초과', min: 250001, max: Infinity }}
+              {{ label: '3억 이하', min: 0, max: 30000 }},
+              {{ label: '3~5억', min: 30001, max: 50000 }},
+              {{ label: '5~8억', min: 50001, max: 80000 }},
+              {{ label: '8~10억', min: 80001, max: 100000 }},
+              {{ label: '10억 이상', min: 100001, max: Infinity }}
             ];
 
             function countByCategory(data) {{
-              const counts = [0, 0, 0, 0];
+              const counts = [0, 0, 0, 0, 0];
               Object.entries(data).forEach(([bracket, cnt]) => {{
                 const b = parseInt(bracket);
-                if (b <= 90000) counts[0] += cnt;
-                else if (b <= 140000) counts[1] += cnt;
-                else if (b <= 240000) counts[2] += cnt;
-                else counts[3] += cnt;
+                if (b <= 20000) counts[0] += cnt;
+                else if (b <= 40000) counts[1] += cnt;
+                else if (b <= 70000) counts[2] += cnt;
+                else if (b <= 90000) counts[3] += cnt;
+                else counts[4] += cnt;
               }});
               return counts;
             }}
@@ -16516,7 +16518,7 @@ document.addEventListener('DOMContentLoaded', function() {{
             if (catP1Title) catP1Title.textContent = oldLabel;
             if (catP2Title) catP2Title.textContent = newLabel;
 
-            const barColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'];
+            const barColors = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
             let html = '';
             for (let i = 0; i < categories.length; i++) {{

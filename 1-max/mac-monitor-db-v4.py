@@ -7295,7 +7295,7 @@ if (isMulti) {{
         
         cards = "\n".join(cards_html)
         
-        html_content = f"""<!DOCTYPE html>
+        html_content = rf"""<!DOCTYPE html>
         <html lang="ko">
         <head>
         <meta charset="utf-8"/>
@@ -9590,7 +9590,7 @@ if (isMulti) {{
         # 더 이상 cards_html 생성하지 않음 (JavaScript에서 동적 생성)
         area_display = f"{target_area}㎡"
 
-        html_content = f"""<!DOCTYPE html>
+        html_content = rf"""<!DOCTYPE html>
         <html lang="ko">
         <head>
         <meta charset="utf-8"/>
@@ -13098,7 +13098,7 @@ function closeChartModal() {
         except Exception as _e:
             logging.warning(f"KB 월간 차트 파일 탐색 실패: {_e}")
 
-        html_content = f"""<!DOCTYPE html>
+        html_content = rf"""<!DOCTYPE html>
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
